@@ -1,4 +1,5 @@
 // available langs
+import * as path from 'path';
 
 export type LanguageItem = {
   cr_locale?: string,
@@ -150,7 +151,46 @@ const sortTags = (data: string[]) => {
 
 const subsFile = (fnOutput:string, subsIndex: string, langItem: LanguageItem, isCC: boolean, ccTag: string, isSigns?: boolean, format?: string) => {
   subsIndex = (parseInt(subsIndex) + 1).toString().padStart(2, '0');
-  return `${fnOutput}.${subsIndex}.${langItem.code}.${langItem.language}${isCC ? `.${ccTag}` : ''}${isSigns ? '.signs' : ''}.${format ? format : 'ass'}`;
+  const suffix = `.${subsIndex}.${langItem.code}.${langItem.language}${isCC ? `.${ccTag}` : ''}${isSigns ? '.signs' : ''}.${format ? format : 'ass'}`;
+  
+  // Check if the full subtitle filename would exceed path limits
+  const fullSubtitlePath = `${fnOutput}${suffix}`;
+  const maxLength = process.platform === 'win32' ? 260 : 4096;
+  
+  if (fullSubtitlePath.length > maxLength) {
+    // Split path into directory and filename parts
+    const pathParts = fnOutput.split(/[/\\]/);
+    const filename = pathParts[pathParts.length - 1];
+    const directory = pathParts.slice(0, -1).join('/');
+    
+    // Calculate available space for the filename part
+    const directoryLength = directory.length + (directory ? 1 : 0); // +1 for path separator
+    const availableSpace = maxLength - directoryLength - suffix.length - 3; // -3 for "..."
+    
+    if (availableSpace > 10) {
+      const lastDotIndex = filename.lastIndexOf('.');
+      if (lastDotIndex > 0) {
+        const nameWithoutExt = filename.substring(0, lastDotIndex);
+        const extension = filename.substring(lastDotIndex);
+        const truncatedName = nameWithoutExt.substring(0, Math.max(0, availableSpace - extension.length)) + '...';
+        const newFilename = `${truncatedName}${extension}${suffix}`;
+        const result = directory ? `${directory}${path.sep}${newFilename}` : newFilename;
+        return result;
+      } else {
+        const truncatedName = filename.substring(0, Math.max(0, availableSpace)) + '...';
+        const newFilename = `${truncatedName}${suffix}`;
+        const result = directory ? `${directory}${path.sep}${newFilename}` : newFilename;
+        return result;
+      }
+    } else {
+      // Not enough space, use a simple fallback
+      const fallbackFilename = `subtitle.${subsIndex}.${langItem.code}.${format ? format : 'ass'}`;
+      const result = directory ? `${directory}/${fallbackFilename}` : fallbackFilename;
+      return result;
+    }
+  }
+  
+  return fullSubtitlePath;
 };
 
 // construct dub langs const

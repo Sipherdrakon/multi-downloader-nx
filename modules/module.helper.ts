@@ -39,6 +39,65 @@ export default class Helper {
       .replace(windowsTrailingRe, fixingChar);
   }
 
+
+  static checkPathLength(filePath: string): {
+    isValid: boolean;
+    length: number;
+    maxLength: number;
+    warning?: string;
+  } {
+    const maxLength = process.platform === 'win32' ? 260 : 4096; // Windows MAX_PATH vs typical Unix limit
+    const length = filePath.length;
+    const isValid = length <= maxLength;
+    
+    let warning: string | undefined;
+    if (!isValid) {
+      warning = `Path length (${length}) exceeds ${process.platform === 'win32' ? 'Windows MAX_PATH' : 'system'} limit (${maxLength})`;
+    } else if (length > maxLength * 0.8) {
+      warning = `Path length (${length}) is approaching the limit (${maxLength}). Consider shortening filename template.`;
+    }
+
+    return {
+      isValid,
+      length,
+      maxLength,
+      warning
+    };
+  }
+
+  static calculateSuffixLength(audioLanguages: string[], subtitleLanguages: string[], ccTag: string = 'cc'): number {
+    // Import languages here to avoid circular dependency
+    const { languages } = require('./module.langsData');
+    
+    // Find the longest language names and codes that will actually be used
+    const usedLanguages = [...new Set([...audioLanguages, ...subtitleLanguages])];
+    const languageItems = usedLanguages.map(lang => 
+      languages.find((l: any) => l.code === lang || l.locale === lang)
+    ).filter(Boolean);
+    
+    if (languageItems.length === 0) {
+      // Fallback to maximum possible if no languages found
+      const maxLanguageNameLength = Math.max(...languages.map((l: any) => (l.language || l.name).length));
+      const maxLanguageCodeLength = Math.max(...languages.map((l: any) => l.code.length));
+      const maxAudioSuffixLength = 1 + maxLanguageNameLength + 7 + 4; // . + language + .audio + .m4s
+      const maxSubtitleSuffixLength = 1 + 2 + 1 + maxLanguageCodeLength + 1 + maxLanguageNameLength + 3 + 1 + 3; // .99.${code}.${name}.cc.ass
+      return Math.max(maxAudioSuffixLength, maxSubtitleSuffixLength) + 10;
+    }
+    
+    const maxLanguageNameLength = Math.max(...languageItems.map((l: any) => (l.language || l.name).length));
+    const maxLanguageCodeLength = Math.max(...languageItems.map((l: any) => l.code.length));
+    
+    // Audio suffix: .${languageName}.audio.m4s
+    const maxAudioSuffixLength = 1 + maxLanguageNameLength + 7 + 4; // . + language + .audio + .m4s
+    
+    // Subtitle suffix: .${subIndex}.${languageCode}.${languageName}${ccTag?}.${format}
+    const maxSubtitleSuffixLength = 1 + 2 + 1 + maxLanguageCodeLength + 1 + maxLanguageNameLength + 3 + 1 + 3; // .99.${code}.${name}.cc.ass
+    
+    // Use the longer of the two, plus some buffer for safety
+    return Math.max(maxAudioSuffixLength, maxSubtitleSuffixLength) + 10;
+  }
+
+
   static exec(
     pname: string,
     fpath: string,

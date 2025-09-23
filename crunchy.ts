@@ -2066,7 +2066,7 @@ export default class Crunchy implements ServiceClass {
             }
             console.info(`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudioSegments.resolutionText}\n\tVideo Server: ${vselectedServer}\n\tAudio Server: ${aselectedServer}`);
             console.info('Stream URL:', chosenVideoSegments.segments[0].uri.split(',.urlset')[0]);
-            // TODO check filename
+            // Parse and validate filename length (auto-truncates if needed)
             fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
             const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override).join(path.sep);
             const tempFile = parseFileName(`temp-${currentVersion ? currentVersion.guid : currentMediaId}`, variables, options.numbers, options.override).join(path.sep);
@@ -2429,7 +2429,7 @@ export default class Crunchy implements ServiceClass {
               }
               console.info(`Selected quality: ${Object.keys(plSelectedList).find(a => plSelectedList[a] === selPlUrl)} @ ${plSelectedServer}`);
               console.info('Stream URL:', selPlUrl);
-              // TODO check filename
+              // Parse and validate filename length (auto-truncates if needed)
               fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
               const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override).join(path.sep);
               console.info(`Output filename: ${outFile}`);

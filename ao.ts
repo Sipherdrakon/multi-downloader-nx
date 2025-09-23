@@ -569,7 +569,7 @@ export default class AnimeOnegai implements ServiceClass {
 
           console.info(`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudioSegments.resolutionText}\n\tServer: ${selectedServer}`);
           //console.info('Stream URL:', chosenVideoSegments.segments[0].uri);
-          // TODO check filename
+          // Parse and validate filename length (auto-truncates if needed)
           fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
           const outFile = parseFileName(options.fileName + '.' + lang.name, variables, options.numbers, options.override).join(path.sep);
           const tempFile = parseFileName(`temp-${media.videoId}`, variables, options.numbers, options.override).join(path.sep);

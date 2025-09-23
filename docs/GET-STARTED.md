@@ -1,4 +1,4 @@
-# multi-downloader-nx (v5.5.3)
+# multi-downloader-nx (v5.5.4)
 
 If you find any bugs in this documentation or in the program itself please report it [over on GitHub](https://github.com/anidl/multi-downloader-nx/issues).
 
@@ -137,7 +137,6 @@ You have now completed the dependencies installation!
 
 > [!NOTE]
 > If you do not have either a Widevine or PlayReady CDM, you will get an error like "No valid Widevine or PlayReady CDM detected." when trying to download. The same error can also appear if a Widevine CDM is present but corrupted, since it will not be detected or function correctly.
-
 ### Widevine
 
 When you dump your CDM key, you will usually get 2 files. One ending in `.bin` and the other in `.pem`. \
