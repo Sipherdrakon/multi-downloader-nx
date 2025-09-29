@@ -18,6 +18,7 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import { canDecrypt, getKeysPRD, getKeysWVD, cdm } from './modules/cdm';
+import RawOutputManager from './modules/module.raw-output';
 //import vttConvert from './modules/module.vttconvert';
 
 // args
@@ -117,12 +118,38 @@ export default class Crunchy implements ServiceClass {
     }
     else if(argv.search && argv.search.length > 2){
       await this.refreshToken();
-      await this.doSearch({ ...argv, search: argv.search as string });
+      const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
+      
+      // Handle raw output for search
+      if (RawOutputManager.shouldOutputRaw(argv)) {
+        await RawOutputManager.saveRawOutput({
+          service: 'crunchy',
+          data: searchResults,
+          outputPath: RawOutputManager.getOutputPath(argv),
+          dataType: 'search',
+          description: `Search results for "${argv.search}"`
+        });
+        return;
+      }
     }
     else if(argv.series && argv.series.match(/^[0-9A-Z]{9,}$/)){
       await this.refreshToken();
       await this.logSeriesById(argv.series as string);
+      // Handle raw output for series - respect episode selection or get all if no specific episodes requested
+      if (RawOutputManager.shouldOutputRaw(argv)) {
+        const rawSelected = await this.downloadFromSeriesID(argv.series, { ...argv, all: argv.all || (!argv.e && !argv.but) });
+        await RawOutputManager.saveRawOutput({
+          service: 'crunchy',
+          data: rawSelected,
+          outputPath: RawOutputManager.getOutputPath(argv),
+          dataType: 'series',
+          description: `Series ${argv.series} data with episodes`
+        });
+        return true;
+      }
+      
       const selected = await this.downloadFromSeriesID(argv.series, { ...argv });
+      
       if (selected.isOk) {
         for (const select of selected.value) {
           if (!(await this.downloadEpisode(select, {...argv, skipsubs: false}, true))) {
@@ -1056,15 +1083,13 @@ export default class Crunchy implements ServiceClass {
     const newlyAddedResults = await newlyAddedReq.res.json();
 
     if (raw) {
-      console.info(JSON.stringify(newlyAddedResults, null, 2));
-      if (rawoutput) {
-        try {
-          fs.writeFileSync(rawoutput, JSON.stringify(newlyAddedResults), { encoding: 'utf-8' });
-          console.info(`Raw output saved to ${rawoutput}`);
-        } catch (e) {
-          console.error(`Failed to save raw output to ${rawoutput}:`, e);
-        }
-      }
+      await RawOutputManager.saveRawOutput({
+        service: 'crunchy',
+        data: newlyAddedResults,
+        outputPath: rawoutput,
+        dataType: 'other',
+        description: `Newly added ${type} content`
+      });
       return;
     }
 

@@ -476,13 +476,13 @@ If true, the tool won't check for updates
 | --- | --- | --- | --- | --- | --- | ---| 
 | All | `--raw ` | `boolean` | `No`| `NaN` | `false`| `raw: ` |
 
-If true, the tool will output the raw data from the API (Where applicable, the feature is a WIP)
+If true, the tool will output the raw data from the API in structured JSON format. Works with search results, series data, and episode information across all services.
 #### `--rawoutput`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
 | All | `--rawoutput ` | `string` | `No`| `NaN` | ``| `rawoutput: ` |
 
-Provide a path to output the raw data from the API into a file (Where applicable, the feature is a WIP)
+Provide a path to output the raw data from the API into a file. Works across all services and provides structured JSON output with metadata.
 ### Help
 #### `--help`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
