@@ -5,7 +5,7 @@ export interface RawOutputOptions {
   service: string;
   data: any;
   outputPath?: string;
-  dataType: 'search' | 'series' | 'episodes' | 'seasons' | 'playback' | 'other';
+  dataType: 'search' | 'series' | 'episodes' | 'seasons' | 'shows' | 'playback' | 'other';
   description?: string;
 }
 
