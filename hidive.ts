@@ -17,6 +17,7 @@ import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import vtt2ass from './modules/module.vtt2ass';
 import Helper from './modules/module.helper';
+import RawOutputManager from './modules/module.raw-output';
 
 // load req
 import { domain, api } from './modules/module.api-urls';
@@ -73,8 +74,33 @@ export default class Hidive implements ServiceClass {
 				password: argv.password ?? (await Helper.question('[Q] PASSWORD: '))
 			});
 		} else if (argv.search && argv.search.length > 2) {
-			await this.doSearch({ ...argv, search: argv.search as string });
+			const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
+			
+			// Handle raw output for search
+			if (RawOutputManager.shouldOutputRaw(argv)) {
+				await RawOutputManager.saveRawOutput({
+					service: 'hidive',
+					data: searchResults,
+					outputPath: RawOutputManager.getOutputPath(argv),
+					dataType: 'search',
+					description: `Search results for "${argv.search}"`
+				});
+				return;
+			}
 		} else if (argv.s && !isNaN(parseInt(argv.s, 10)) && parseInt(argv.s, 10) > 0) {
+			// Handle raw output for season data - capture ALL episodes for raw data
+			if (RawOutputManager.shouldOutputRaw(argv)) {
+				const rawSelected = await this.selectSeason(parseInt(argv.s), argv.e, argv.but, argv.all || (!argv.e && !argv.but));
+				await RawOutputManager.saveRawOutput({
+					service: 'hidive',
+					data: rawSelected,
+					outputPath: RawOutputManager.getOutputPath(argv),
+					dataType: 'seasons',
+					description: `Season ${argv.s} data with episodes`
+				});
+				return true;
+			}
+			
 			const selected = await this.selectSeason(parseInt(argv.s), argv.e, argv.but, argv.all);
 			if (selected.isOk && selected.showData) {
 				for (const select of selected.value) {
@@ -418,7 +444,7 @@ export default class Hidive implements ServiceClass {
 					episode.title = episode.title.split(' - ')[1];
 				}
 				//S${episode.episodeInformation.seasonNumber}E${episode.episodeInformation.episodeNumber} -
-				if (!datePattern.test(episode.title) && episode.duration !== 10) {
+				if (episode.duration !== 10) { // Removed datePattern check
 					episodes.push(episode);
 				}
 				console.info(`    [E.${episode.id}] ${episode.title}`);
@@ -449,7 +475,7 @@ export default class Hidive implements ServiceClass {
 				episode.title = episode.title.split(' - ')[1];
 			}
 			//S${episode.episodeInformation.seasonNumber}E${episode.episodeInformation.episodeNumber} -
-			if (!datePattern.test(episode.title) && episode.duration !== 10) {
+			if (episode.duration !== 10) { // Removed datePattern check
 				episodes.push(episode);
 			}
 			console.info(`    [E.${episode.id}] ${episode.title}`);

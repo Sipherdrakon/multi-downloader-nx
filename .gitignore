@@ -44,4 +44,4 @@ bin
 widevine/*
 !widevine/.gitkeep
 playready/*
-!playready/.gitkeep
+!playready/.gitkeepFINAL_BUILDS/
