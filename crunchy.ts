@@ -37,7 +37,7 @@ import parseSelect from './modules/module.parseSelect';
 import { AvailableFilenameVars, getDefault } from './modules/module.args';
 import { AuthData, AuthResponse, Episode, ResponseBase, SearchData, SearchResponse, SearchResponseItem } from './@types/messageHandler';
 import { ServiceClass } from './@types/serviceClassInterface';
-import { CrunchyAndroidStreams } from './@types/crunchyAndroidStreams';
+import { Streams, Download, Urls, Version, Locale } from './@types/crunchyAndroidStreams';
 import { CrunchyAndroidEpisodes } from './@types/crunchyAndroidEpisodes';
 import { parse } from './modules/module.transform-mpd';
 import { CrunchyAndroidObject } from './@types/crunchyAndroidObject';
@@ -471,7 +471,7 @@ export default class Crunchy implements ServiceClass {
     }
     this.token = await authReq.res.json();
     this.token.device_id = uuid;
-    this.token.expires = new Date(Date.now() + this.token.expires_in);
+    this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
     yamlCfg.saveCRToken(this.token);
     await this.getProfile();
     console.info('Your Country: %s', this.token.country);
@@ -510,7 +510,7 @@ export default class Crunchy implements ServiceClass {
     }
     this.token = await authReq.res.json();
     this.token.device_id = uuid;
-    this.token.expires = new Date(Date.now() + this.token.expires_in);
+    this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
     yamlCfg.saveCRToken(this.token);
   }
 
@@ -581,7 +581,7 @@ export default class Crunchy implements ServiceClass {
     }
     this.token = await authReq.res.json();
     this.token.device_id = uuid;
-    this.token.expires = new Date(Date.now() + this.token.expires_in);
+    this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
     yamlCfg.saveCRToken(this.token);
     await this.getProfile(false);
     await this.getCMStoken(true);
@@ -633,7 +633,7 @@ export default class Crunchy implements ServiceClass {
       }
       this.token = await authReq.res.json();
       this.token.device_id = uuid;
-      this.token.expires = new Date(Date.now() + this.token.expires_in);
+      this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
       yamlCfg.saveCRToken(this.token);
     }
     if(this.token.refresh_token) {
