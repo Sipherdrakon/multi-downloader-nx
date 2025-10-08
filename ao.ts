@@ -12,6 +12,7 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import * as reqModule from './modules/module.fetch';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
+import RawOutputManager from './modules/module.raw-output';
 import { canDecrypt, getKeysWVD, cdm, getKeysPRD } from './modules/cdm';
 import streamdl, { M3U8Json } from './modules/hls-download';
 import { console } from './modules/log';
@@ -105,9 +106,35 @@ export default class AnimeOnegai implements ServiceClass {
       });
     } else if (argv.search && argv.search.length > 2) {
       //Search
-      await this.doSearch({ ...argv, search: argv.search as string });
+      const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
+      
+      // Handle raw output for search
+      if (RawOutputManager.shouldOutputRaw(argv)) {
+        await RawOutputManager.saveRawOutput({
+          service: 'ao',
+          data: searchResults,
+          outputPath: RawOutputManager.getOutputPath(argv),
+          dataType: 'search',
+          description: `Search results for "${argv.search}"`
+        });
+        return;
+      }
     } else if (argv.s && !isNaN(parseInt(argv.s,10)) && parseInt(argv.s,10) > 0) {
+      // Handle raw output for show data - respect episode selection or get all if no specific episodes requested
+      if (RawOutputManager.shouldOutputRaw(argv)) {
+        const rawSelected = await this.selectShow(parseInt(argv.s), argv.e, argv.but, argv.all || (!argv.e && !argv.but), argv);
+        await RawOutputManager.saveRawOutput({
+          service: 'ao',
+          data: rawSelected,
+          outputPath: RawOutputManager.getOutputPath(argv),
+          dataType: 'series',
+          description: `Show ${argv.s} data with episodes`
+        });
+        return true;
+      }
+      
       const selected = await this.selectShow(parseInt(argv.s), argv.e, argv.but, argv.all, argv);
+      
       if (selected.isOk) {
         for (const select of selected.value) {
           if (!(await this.downloadEpisode(select, {...argv, skipsubs: false}))) {

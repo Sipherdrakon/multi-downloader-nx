@@ -15,6 +15,7 @@ import * as langsData from './modules/module.langsData';
 import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
+import RawOutputManager from './modules/module.raw-output';
 import vtt2ass from './modules/module.vtt2ass';
 import Helper from './modules/module.helper';
 
@@ -74,9 +75,35 @@ export default class Hidive implements ServiceClass {
         password: argv.password ?? await Helper.question('[Q] PASSWORD: ')
       });
     } else if (argv.search && argv.search.length > 2){
-      await this.doSearch({ ...argv, search: argv.search as string });
+      const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
+      
+      // Handle raw output for search
+      if (RawOutputManager.shouldOutputRaw(argv)) {
+        await RawOutputManager.saveRawOutput({
+          service: 'hidive',
+          data: searchResults,
+          outputPath: RawOutputManager.getOutputPath(argv),
+          dataType: 'search',
+          description: `Search results for "${argv.search}"`
+        });
+        return;
+      }
     } else if (argv.s && !isNaN(parseInt(argv.s,10)) && parseInt(argv.s,10) > 0) {
+      // Handle raw output for season data - respect episode selection or get all if no specific episodes requested
+      if (RawOutputManager.shouldOutputRaw(argv)) {
+        const rawSelected = await this.selectSeason(parseInt(argv.s), argv.e, argv.but, argv.all || (!argv.e && !argv.but));
+        await RawOutputManager.saveRawOutput({
+          service: 'hidive',
+          data: rawSelected,
+          outputPath: RawOutputManager.getOutputPath(argv),
+          dataType: 'seasons',
+          description: `Season ${argv.s} data with episodes`
+        });
+        return true;
+      }
+      
       const selected = await this.selectSeason(parseInt(argv.s), argv.e, argv.but, argv.all);
+      
       if (selected.isOk && selected.showData) {
         for (const select of selected.value) {
           //download episode
