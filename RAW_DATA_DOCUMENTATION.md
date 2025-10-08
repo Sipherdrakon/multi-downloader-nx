@@ -13,7 +13,7 @@ This document explains the `--raw` and `--rawoutput` functionality for exporting
 
 ## Overview
 
-The raw data export functionality allows you to extract structured episode metadata in JSON format from Crunchyroll, HIDIVE, ADN, and Anime Onegai without downloading video content. This is particularly useful for:
+The raw data export functionality allows you to extract structured episode metadata in JSON format from Crunchyroll, HIDIVE, and ADN without downloading video content. This is particularly useful for:
 
 - RSS feed generation
 - External API integrations
@@ -24,13 +24,13 @@ The raw data export functionality allows you to extract structured episode metad
 
 ### `--raw`
 - **Type**: Boolean flag
-- **Services**: All (Crunchyroll, HIDIVE, ADN, Anime Onegai)
+- **Services**: All (Crunchyroll, HIDIVE, ADN)
 - **Description**: Outputs raw JSON data to console
 - **Usage**: `--raw`
 
 ### `--rawoutput`
 - **Type**: String (file path)
-- **Services**: All (Crunchyroll, HIDIVE, ADN, Anime Onegai)
+- **Services**: All (Crunchyroll, HIDIVE, ADN)
 - **Description**: Saves raw JSON data to specified file
 - **Usage**: `--rawoutput path/to/output.json`
 
@@ -48,8 +48,8 @@ anidl --service hidive --s 31577 --raw --silentAuth --username user@email.com --
 # ADN show
 anidl --service adn --s 1307 --raw --silentAuth --username user --password "password"
 
-# Anime Onegai series
-anidl --service ao --s 297 --raw --token "jwt_token_here"
+# ADN series
+anidl --service adn --s 297 --raw --silentAuth --username user --password "password"
 ```
 
 ### Raw Output to File
@@ -251,11 +251,11 @@ Each episode in the `value` array contains:
 }
 ```
 
-### Anime Onegai Example
+### ADN Example
 
 ```json
 {
-  "service": "ao",
+  "service": "adn",
   "dataType": "series",
   "timestamp": "2025-09-29T07:35:04.299Z", 
   "description": "Show 297 data with episodes",
