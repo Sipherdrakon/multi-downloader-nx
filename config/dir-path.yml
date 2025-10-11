@@ -1,2 +1,3 @@
 content: ./videos/
 fonts: ./fonts/
+# archive: ./config/archive.json  # Optional: Custom download history archive location
