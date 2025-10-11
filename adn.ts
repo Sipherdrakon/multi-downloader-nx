@@ -18,6 +18,7 @@ import * as reqModule from './modules/module.fetch';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import streamdl from './modules/hls-download';
 import { console } from './modules/log';
+import RawOutputManager from './modules/module.raw-output';
 import { domain } from './modules/module.api-urls';
 import { downloaded } from './modules/module.downloadArchive';
 import parseSelect from './modules/module.parseSelect';
@@ -82,9 +83,34 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			});
 		} else if (argv.search && argv.search.length > 2) {
 			//Search
-			await this.doSearch({ ...argv, search: argv.search as string });
+			const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
+			
+			// Handle raw output for search
+			if (RawOutputManager.shouldOutputRaw(argv)) {
+				await RawOutputManager.saveRawOutput({
+					service: 'adn',
+					data: searchResults,
+					outputPath: RawOutputManager.getOutputPath(argv),
+					dataType: 'search',
+					description: `Search results for "${argv.search}"`
+				});
+				return;
+			}
 		} else if (argv.s && !isNaN(parseInt(argv.s, 10)) && parseInt(argv.s, 10) > 0) {
 			const selected = await this.selectShow(parseInt(argv.s), argv.e, argv.but, argv.all);
+			
+			// Handle raw output for show
+			if (RawOutputManager.shouldOutputRaw(argv)) {
+				await RawOutputManager.saveRawOutput({
+					service: 'adn',
+					data: selected,
+					outputPath: RawOutputManager.getOutputPath(argv),
+					dataType: 'series',
+					description: `Show ${argv.s} data with episodes`
+				});
+				return true;
+			}
+			
 			if (selected.isOk) {
 				for (const select of selected.value) {
 					if (!(await this.getEpisode(select, { ...argv, skipsubs: false }))) {
