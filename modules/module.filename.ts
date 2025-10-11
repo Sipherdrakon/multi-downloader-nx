@@ -17,11 +17,21 @@ export type Variable<T extends string = AvailableFilenameVars> = (
 	sanitize?: boolean;
 };
 
-const parseFileName = (input: string, variables: Variable[], numbers: number, override: string[]): string[] => {
+const parseFileName = (
+	input: string,
+	variables: Variable[],
+	numbers: number,
+	override: string[],
+	audioLanguages: string[] = [],
+	subtitleLanguages: string[] = [],
+	ccTag: string = 'cc'
+): string[] => {
 	const varRegex = /\${[A-Za-z1-9]+}/g;
 	const vars = input.match(varRegex);
 	const overridenVars = parseOverride(variables, override);
 	if (!vars) return [input];
+
+	// First pass: replace all variables except {title}
 	for (let i = 0; i < vars.length; i++) {
 		const type = vars[i];
 		const varName = type.slice(2, -1);
@@ -34,6 +44,11 @@ const parseFileName = (input: string, variables: Variable[], numbers: number, ov
 			continue;
 		}
 
+		// Skip {title} for now - we'll handle it separately
+		if (varName === 'title') {
+			continue;
+		}
+
 		if (use.type === 'number') {
 			const len = use.replaceWith.toFixed(0).length;
 			const replaceStr = len < numbers ? '0'.repeat(numbers - len) + use.replaceWith : use.replaceWith + '';
@@ -43,7 +58,49 @@ const parseFileName = (input: string, variables: Variable[], numbers: number, ov
 			input = input.replace(type, use.replaceWith);
 		}
 	}
-	return input.split(path.sep).map((a) => Helper.cleanupFilename(a));
+
+	// Now handle {title} with truncation if needed
+	const titleVar = overridenVars.find((a) => a.name === 'title');
+	if (titleVar && titleVar.type === 'string') {
+		let titleValue = titleVar.replaceWith;
+		if (titleVar.sanitize) {
+			titleValue = Helper.cleanupFilename(titleValue);
+		}
+
+		// Calculate the maximum length available for the title
+		const maxLength = process.platform === 'win32' ? 260 : 4096;
+
+		// Calculate the exact suffix length needed for this specific download
+		const potentialSuffixLength = Helper.calculateSuffixLength(audioLanguages, subtitleLanguages, ccTag);
+		const effectiveMaxLength = maxLength - potentialSuffixLength;
+
+		// Check if truncation is needed
+		const templateWithTitle = input.replace('${title}', titleValue);
+		const pathCheck = Helper.checkPathLength(templateWithTitle);
+
+		if (!pathCheck.isValid || templateWithTitle.length > effectiveMaxLength) {
+			// Calculate how much space we have for the title
+			const templateWithoutTitle = input.replace('${title}', '');
+			const availableSpace = effectiveMaxLength - templateWithoutTitle.length;
+
+			if (availableSpace > 10) {
+				// Leave some buffer
+				const maxTitleLength = availableSpace - 3; // -3 for "..."
+				if (titleValue.length > maxTitleLength) {
+					titleValue = titleValue.substring(0, maxTitleLength) + '...';
+				}
+			} else {
+				// Not enough space even for a short title, use fallback
+				titleValue = 'Episode';
+			}
+		}
+
+		// Replace the title variable with the processed value
+		input = input.replace('${title}', titleValue);
+	}
+
+	const cleanedParts = input.split(path.sep).map((a) => Helper.cleanupFilename(a));
+	return cleanedParts;
 };
 
 const parseOverride = (variables: Variable[], override: string[]): Variable<string>[] => {
