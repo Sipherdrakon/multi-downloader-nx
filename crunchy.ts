@@ -18,6 +18,7 @@ import * as yamlCfg from './modules/module.cfg-loader';
 import * as yargs from './modules/module.app-args';
 import Merger, { Font, MergerInput, SubtitleInput } from './modules/module.merger';
 import { canDecrypt, getKeysPRD, getKeysWVD, cdm } from './modules/cdm';
+import RawOutputManager from './modules/module.raw-output';
 
 // load req
 import { domain, api } from './modules/module.api-urls';
@@ -108,10 +109,36 @@ export default class Crunchy implements ServiceClass {
 			await this.getNewlyAdded(argv.page, argv['search-type'], argv.raw, argv.rawoutput);
 		} else if (argv.search && argv.search.length > 2) {
 			await this.refreshToken();
-			await this.doSearch({ ...argv, search: argv.search as string });
+			const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
+			
+			// Handle raw output for search
+			if (RawOutputManager.shouldOutputRaw(argv)) {
+				await RawOutputManager.saveRawOutput({
+					service: 'crunchy',
+					data: searchResults,
+					outputPath: RawOutputManager.getOutputPath(argv),
+					dataType: 'search',
+					description: `Search results for "${argv.search}"`
+				});
+				return;
+			}
 		} else if (argv.series && argv.series.match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();
 			await this.logSeriesById(argv.series as string);
+			
+			// Handle raw output for series
+			if (RawOutputManager.shouldOutputRaw(argv)) {
+				const rawSelected = await this.downloadFromSeriesID(argv.series, { ...argv, all: argv.all || (!argv.e && !argv.but) });
+				await RawOutputManager.saveRawOutput({
+					service: 'crunchy',
+					data: rawSelected,
+					outputPath: RawOutputManager.getOutputPath(argv),
+					dataType: 'series',
+					description: `Series ${argv.series} data with episodes`
+				});
+				return true;
+			}
+			
 			const selected = await this.downloadFromSeriesID(argv.series, { ...argv });
 			if (selected.isOk) {
 				for (const select of selected.value) {
