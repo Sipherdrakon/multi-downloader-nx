@@ -81,6 +81,7 @@ export type ConfigObject = {
 		trash: string;
 		fonts: string;
 		config: string;
+		archive?: string;
 	};
 	bin: {
 		ffmpeg?: string;
@@ -104,6 +105,7 @@ const loadCfg = (): ConfigObject => {
 			trash: string;
 			fonts: string;
 			config: string;
+			archive?: string;
 		}>(dirCfgFile),
 		cli: loadYamlCfgFile<{
 			[key: string]: any;

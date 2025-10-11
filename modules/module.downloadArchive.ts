@@ -1,9 +1,20 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { ArgvType } from './module.app-args';
-import { workingDir } from './module.cfg-loader';
+import { workingDir, loadCfg } from './module.cfg-loader';
 
-export const archiveFile = path.join(workingDir, 'config', 'archive.json');
+// Use configured archive path if set, otherwise use default
+const getArchiveFile = (): string => {
+	const cfg = loadCfg();
+	if (cfg.dir.archive) {
+		// If path is relative, resolve it relative to workingDir
+		return path.isAbsolute(cfg.dir.archive) ? cfg.dir.archive : path.join(workingDir, cfg.dir.archive);
+	}
+	// Default location
+	return path.join(workingDir, 'config', 'archive.json');
+};
+
+export const archiveFile = getArchiveFile();
 
 export type ItemType = {
 	id: string;
