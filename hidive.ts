@@ -20,7 +20,7 @@ import Helper from './modules/module.helper';
 import RawOutputManager from './modules/module.raw-output';
 
 // load req
-import { domain, api } from './modules/module.api-urls';
+import { api } from './modules/module.api-urls';
 import * as reqModule from './modules/module.fetch';
 import { DownloadedMedia } from './@types/hidiveTypes';
 import parseFileName, { Variable } from './modules/module.filename';

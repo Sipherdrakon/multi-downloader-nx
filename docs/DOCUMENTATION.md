@@ -1,4 +1,4 @@
-# multi-downloader-nx (v5.6.1)
+# multi-downloader-nx (v5.6.5)
 
 If you find any bugs in this documentation or in the program itself please report it [over on GitHub](https://github.com/anidl/multi-downloader-nx/issues).
 
@@ -195,19 +195,19 @@ Select the server to use
 | --- | --- | --- | --- | --- | --- | ---| 
 | Crunchyroll | `--cstream ${device}` | `string` | `No`| `--cs` | [`androidtv`, `android`, `androidtab`, `none`] | `NaN` |
 
-(Please use --vstream and --astream instead, this will deprecate soon) Select a specific Crunchyroll playback endpoint by device. Since Crunchyroll has started rolling out their new VBR encodes, we highly recommend using a TV endpoint (e.g. vidaa, samsungtv, lgtv, rokutv, chromecast, firetv, androidtv) to access the old CBR encodes. Please note: The older encodes do not include the new 192 kbps audio, the new audio is only available with the new VBR encodes.
+(Please use --vstream and --astream instead, this will deprecate soon)
 #### `--vstream`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
 | Crunchyroll | `--vstream ${device}` | `string` | `No`| `--vs` | [`androidtv`, `android`, `androidtab`, `none`] | `androidtv`| `vstream: ` |
 
-Select a specific Crunchyroll video playback endpoint by device.
+Select a specific Crunchyroll video playback endpoint by device. androidtv provides the best video (CBR).
 #### `--astream`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
 | Crunchyroll | `--astream ${device}` | `string` | `No`| `--as` | [`androidtv`, `android`, `androidtab`, `none`] | `android`| `astream: ` |
 
-Select a specific Crunchyroll audio playback endpoint by device.
+Select a specific Crunchyroll audio playback endpoint by device. android provides the best audio (192 kbps).
 #### `--tsd`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -536,7 +536,7 @@ Provide a path to output the raw data from the API into a file (Where applicable
 | --- | --- | --- | --- | --- | --- | ---| 
 | All | `--proxy ${proxy_url}` | `string` | `No`| `NaN` | ``| `proxy: ` |
 
-Uses Proxy on geo-restricted or geo-defining endpoints (e.g. socks5://127.0.0.1:1080 or http://127.0.0.1:1080)
+Uses Proxy on geo-restricted or geo-defining endpoints (e.g. https://127.0.0.1:1080 or http://127.0.0.1:1080)
 #### `--proxyAll`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 

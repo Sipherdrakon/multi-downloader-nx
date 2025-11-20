@@ -295,8 +295,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		alias: 'cs',
 		service: ['crunchy'],
 		type: 'string',
-		describe:
-			'(Please use --vstream and --astream instead, this will deprecate soon) Select a specific Crunchyroll playback endpoint by device. Since Crunchyroll has started rolling out their new VBR encodes, we highly recommend using a TV endpoint (e.g. vidaa, samsungtv, lgtv, rokutv, chromecast, firetv, androidtv) to access the old CBR encodes. Please note: The older encodes do not include the new 192 kbps audio, the new audio is only available with the new VBR encodes.',
+		describe: '(Please use --vstream and --astream instead, this will deprecate soon)',
 		choices: [...Object.keys(CrunchyVideoPlayStreams), 'none'],
 		docDescribe: true,
 		usage: '${device}'
@@ -307,7 +306,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		alias: 'vs',
 		service: ['crunchy'],
 		type: 'string',
-		describe: 'Select a specific Crunchyroll video playback endpoint by device.',
+		describe: 'Select a specific Crunchyroll video playback endpoint by device. androidtv provides the best video (CBR).',
 		choices: [...Object.keys(CrunchyVideoPlayStreams), 'none'],
 		default: {
 			default: 'androidtv'
@@ -321,7 +320,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		alias: 'as',
 		service: ['crunchy'],
 		type: 'string',
-		describe: 'Select a specific Crunchyroll audio playback endpoint by device.',
+		describe: 'Select a specific Crunchyroll audio playback endpoint by device. android provides the best audio (192 kbps).',
 		choices: [...Object.keys(CrunchyAudioPlayStreams), 'none'],
 		default: {
 			default: 'android'
@@ -1017,7 +1016,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 	},
 	{
 		name: 'proxy',
-		describe: 'Uses Proxy on geo-restricted or geo-defining endpoints (e.g. socks5://127.0.0.1:1080 or http://127.0.0.1:1080)',
+		describe: 'Uses Proxy on geo-restricted or geo-defining endpoints (e.g. https://127.0.0.1:1080 or http://127.0.0.1:1080)',
 		docDescribe: true,
 		group: 'util',
 		service: ['all'],

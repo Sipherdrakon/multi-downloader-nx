@@ -1,4 +1,4 @@
-# multi-downloader-nx (v5.5.3)
+# multi-downloader-nx (v5.6.1)
 
 If you find any bugs in this documentation or in the program itself please report it [over on GitHub](https://github.com/anidl/multi-downloader-nx/issues).
 
@@ -23,6 +23,7 @@ This tool is not responsible for your actions; please make an informed decision 
     - [Playready CDM](#playready)
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Endpoint Notes](#endpoint-notes)
 - [Usage](#usage)
     - [Authentication](#authentication)
     - [Output Directory](#output-directory)
@@ -38,7 +39,7 @@ This tool is not responsible for your actions; please make an informed decision 
 The dependencies for this application are:
 - [ffmpeg](https://www.videohelp.com/software/ffmpeg)
 - [MKVToolNix](https://www.videohelp.com/software/MKVToolNix)
-- Either [Bento4-SDK (mp4decrypt)](https://www.bento4.com/downloads/) or [shaka-packager](https://github.com/shaka-project/shaka-packager/releases)
+- Either [Bento4-SDK (mp4decrypt)](https://www.bento4.com/downloads/) or [shaka-packager](https://github.com/stratumadev/shaka-packager/releases/latest)
 
 For ffmpeg, i chose this option from the website: \
 ![ffmpeg download](./imgs/ffmpeg.png)
@@ -155,7 +156,8 @@ Again, the renaming is totally optional. Just make sure both files are in the `w
 If you have a Playready CDM key dump, you just need to make sure:
 1. Its provisioned as a V3 Device by [pyplayready](https://github.com/ready-dl/pyplayready).
 2. Security level is either SL2000 or SL3000
-3. Make sure you are using shaka-packager v2.6.1, as later versions have issues.
+3. Make sure you are using the latest version of shaka-packager from Stratuma, as he has patched it to work with multi-downloader-nx.\
+   You can find his releases [here](https://github.com/stratumadev/shaka-packager/releases/latest)
 
 After you have confirmed the above, place the file(s) in the `playready` folder, which is in the same directory you opened `aniDL.exe` from.
 
@@ -212,6 +214,25 @@ If you wanted to set `--tsd` to `true`, you would do it like this:
 ```yaml
 tsd: true
 ```
+
+## Endpoint Notes
+
+This section explains what each endpoint is capable of, and what subscription level is required to use it. \
+If you are new to the project, please use the defaults found in the [`cli-defaults.yml`](https://github.com/HyperNylium/multi-downloader-nx/blob/master/config/cli-defaults.yml) file, as those are the recommended settings.
+
+| Endpoint     | Video quality               | Audio quality | Subscription level required |
+|--------------|-----------------------------|---------------|-----------------------------|
+| `android`    | 4-6k variable bitrate (VBR) | 192kbps       | "Fan" or higher             |
+| `androidtab` | 4-6k variable bitrate (VBR) | 128kbps       | "Fan" or higher             |
+| `androidtv`  | 8k constent bitrate (CBR)   | 128kbps       | "Fan" or higher             |
+
+> [!NOTE]
+> If you pick 192kbps audio (`--astream android`) with 8k CBR video (`--vstream androidtv`) but don’t have "Mega Fan" sub or higher,
+> the audio will fall back to 128 kbps, which will download the CBR video with 128 kbps audio.
+
+> [!NOTE]
+> 192 kbps audio comes from the `android` endpoint. CBR video comes from `androidtv` endpoint. \
+> Using both means you are using **two streams**, which needs the "Mega Fan" tier or higher.
 
 ## Usage
 
