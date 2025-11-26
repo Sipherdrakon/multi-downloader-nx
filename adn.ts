@@ -653,7 +653,9 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 					for (const pl of streamPlaylists.playlists ?? []) {
 						// set quality
 						const plResolution = pl.attributes.RESOLUTION;
-						const plResolutionText = `${plResolution?.width}x${plResolution?.height}`;
+						const plResolutionText = plResolution?.width && plResolution?.height 
+							? `${plResolution.width}x${plResolution.height}` 
+							: 'unknown';
 						// set codecs
 						const plCodecs = pl.attributes.CODECS;
 						// parse uri
