@@ -5,6 +5,7 @@ import { workingDir, loadCfg } from './module.cfg-loader';
 
 // Use configured archive path if set, otherwise use default
 // Resolve dynamically to support config changes
+// This allows config changes to take effect without module reload
 const getArchiveFilePath = (): string => {
 	const cfg = loadCfg();
 	if (cfg.dir.archive) {
@@ -14,19 +15,6 @@ const getArchiveFilePath = (): string => {
 	// Default location
 	return path.join(workingDir, 'config', 'archive.json');
 };
-
-// Export as getter that resolves dynamically each time it's accessed
-// This allows config changes to take effect without module reload
-export const archiveFile: string = (() => {
-	// Create a getter property using Object.defineProperty
-	const exportsObj = module.exports as any;
-	Object.defineProperty(exportsObj, 'archiveFile', {
-		get: getArchiveFilePath,
-		enumerable: true,
-		configurable: true
-	});
-	return getArchiveFilePath(); // Initial value for TypeScript
-})();
 
 export type ItemType = {
 	id: string;
