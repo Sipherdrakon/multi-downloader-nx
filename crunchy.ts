@@ -2218,9 +2218,9 @@ export default class Crunchy implements ServiceClass {
 									)
 								: vstreamPlaylists;
 
-						//Get name of CDNs/Servers
-						const vstreamServers = Object.keys(vstreamPlaylists);
-						const astreamServers = Object.keys(astreamPlaylists);
+					//Get name of CDNs/Servers
+					const vstreamServers = Object.keys(vstreamPlaylists);
+					const astreamServers = Object.keys(astreamPlaylists);
 
 					options.x = options.x > vstreamServers.length ? 1 : options.x;
 
