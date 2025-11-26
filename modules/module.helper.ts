@@ -15,7 +15,7 @@ export default class Helper {
 		const days = Math.floor(t / 86400);
 		const hours = Math.floor((t % 86400) / 3600);
 		const minutes = Math.floor(((t % 86400) % 3600) / 60);
-		const seconds = t % 60;
+		const seconds = Math.floor(t % 60);
 		const daysS = days > 0 ? `${days}d` : '';
 		const hoursS = daysS || hours ? `${daysS}${daysS && hours < 10 ? '0' : ''}${hours}h` : '';
 		const minutesS = minutes || hoursS ? `${hoursS}${hoursS && minutes < 10 ? '0' : ''}${minutes}m` : '';
@@ -65,6 +65,11 @@ export default class Helper {
 	}
 
 	static calculateSuffixLength(audioLanguages: string[], subtitleLanguages: string[], ccTag: string = 'cc'): number {
+		// If no languages are provided, no suffix will be added
+		if (audioLanguages.length === 0 && subtitleLanguages.length === 0) {
+			return 0;
+		}
+
 		// Import languages here to avoid circular dependency
 		const { languages } = require('./module.langsData');
 
@@ -73,19 +78,16 @@ export default class Helper {
 		const languageItems = usedLanguages.map((lang) => languages.find((l: any) => l.code === lang || l.locale === lang)).filter(Boolean);
 
 		if (languageItems.length === 0) {
-			// Fallback to maximum possible if no languages found
-			const maxLanguageNameLength = Math.max(...languages.map((l: any) => (l.language || l.name).length));
-			const maxLanguageCodeLength = Math.max(...languages.map((l: any) => l.code.length));
-			const maxAudioSuffixLength = 1 + maxLanguageNameLength + 7 + 4; // . + language + .audio + .m4s
-			const maxSubtitleSuffixLength = 1 + 2 + 1 + maxLanguageCodeLength + 1 + maxLanguageNameLength + 3 + 1 + 3; // .99.${code}.${name}.cc.ass
-			return Math.max(maxAudioSuffixLength, maxSubtitleSuffixLength) + 10;
+			// Languages were provided but not found in language list - return 0 to avoid aggressive truncation
+			// This should not happen in normal operation, but if it does, we don't want to truncate unnecessarily
+			return 0;
 		}
 
 		const maxLanguageNameLength = Math.max(...languageItems.map((l: any) => (l.language || l.name).length));
 		const maxLanguageCodeLength = Math.max(...languageItems.map((l: any) => l.code.length));
 
 		// Audio suffix: .${languageName}.audio.m4s
-		const maxAudioSuffixLength = 1 + maxLanguageNameLength + 7 + 4; // . + language + .audio + .m4s
+		const maxAudioSuffixLength = 1 + maxLanguageNameLength + 6 + 4; // . + language + .audio + .m4s
 
 		// Subtitle suffix: .${subIndex}.${languageCode}.${languageName}${ccTag?}.${format}
 		const maxSubtitleSuffixLength = 1 + 2 + 1 + maxLanguageCodeLength + 1 + maxLanguageNameLength + 3 + 1 + 3; // .99.${code}.${name}.cc.ass

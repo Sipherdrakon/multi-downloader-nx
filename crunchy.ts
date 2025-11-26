@@ -124,7 +124,6 @@ export default class Crunchy implements ServiceClass {
 			}
 		} else if (argv.series && argv.series.match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();
-			await this.logSeriesById(argv.series as string);
 			
 			// Handle raw output for series
 			if (RawOutputManager.shouldOutputRaw(argv)) {
@@ -139,7 +138,10 @@ export default class Crunchy implements ServiceClass {
 				return true;
 			}
 			
-			const selected = await this.downloadFromSeriesID(argv.series, { ...argv });
+			// Only log series info if not using raw output
+			await this.logSeriesById(argv.series as string);
+			
+			const selected = await this.downloadFromSeriesID(argv.series, { ...argv, all: argv.all || (!argv.e && !argv.but) });
 			if (selected.isOk) {
 				for (const select of selected.value) {
 					if (!(await this.downloadEpisode(select, { ...argv, skipsubs: false }, true))) {
@@ -1573,7 +1575,7 @@ export default class Crunchy implements ServiceClass {
 		}
 
 		try {
-			console.warn('[WARN] 1080p not available (max %sp) from static manifest. Trying evs3 endpoint for 1080p...', currentMaxQuality);
+			console.warn('[WARN] 1080p not available (max %dp) from static manifest. Trying evs3 endpoint for 1080p...', currentMaxQuality);
 
 			const crPlayServiceReq = await this.req.getData(
 				`https://cr-play-service.prd.crunchyrollsvc.com/v1/${mediaId}/tv/android_tv/play`,
@@ -1634,7 +1636,7 @@ export default class Crunchy implements ServiceClass {
 					};
 				});
 
-				console.info('[INFO] Using evs3 manifest with %sp quality (was %sp)', evs3MaxQuality, currentMaxQuality);
+				console.info('[INFO] Using evs3 manifest with %dp quality (was %dp)', evs3MaxQuality, currentMaxQuality);
 
 				return {
 					stream: crPlayServiceStream,
@@ -1644,7 +1646,7 @@ export default class Crunchy implements ServiceClass {
 					audios: evs3Audios.sort((a, b) => a.bandwidth - b.bandwidth)
 				};
 			} else {
-				console.warn('[WARN] evs3 manifest also only has %sp max quality', evs3MaxQuality);
+				console.warn('[WARN] evs3 manifest also only has %dp max quality', evs3MaxQuality);
 				return null;
 			}
 		} catch (err) {
@@ -2356,9 +2358,9 @@ export default class Crunchy implements ServiceClass {
 						);
 						console.info('Stream URL:', chosenVideoSegments.segments[0].uri.split(',.urlset')[0]);
 						// TODO check filename
-						fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
-						const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override).join(path.sep);
-						const tempFile = parseFileName(`temp-${currentVersion ? currentVersion.guid : currentMediaId}`, variables, options.numbers, options.override).join(
+						fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+						const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+						const tempFile = parseFileName(`temp-${currentVersion ? currentVersion.guid : currentMediaId}`, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(
 							path.sep
 						);
 						const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
@@ -2763,8 +2765,8 @@ export default class Crunchy implements ServiceClass {
 							console.info(`Selected quality: ${Object.keys(plSelectedList).find((a) => plSelectedList[a] === selPlUrl)} @ ${plSelectedServer}`);
 							console.info('Stream URL:', selPlUrl);
 							// TODO check filename
-							fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
-							const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override).join(path.sep);
+							fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+							const outFile = parseFileName(options.fileName + '.' + (mMeta.lang?.name || lang.name), variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 							console.info(`Output filename: ${outFile}`);
 							const chunkPage = await this.req.getData(selPlUrl, {
 								headers: api.crunchyDefHeader
@@ -2836,18 +2838,18 @@ export default class Crunchy implements ServiceClass {
 							dlFailed = true;
 						}
 					} else if (options.novids) {
-						fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
+						fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 						console.info('Downloading skipped!');
 					}
 				}
 			} else if (options.novids && options.noaudio) {
-				fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
+				fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 			}
 
 			if (compiledChapters.length > 0) {
 				try {
-					fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
-					const outFile = parseFileName(options.fileName + '.' + mMeta.lang?.name, variables, options.numbers, options.override).join(path.sep);
+					fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+					const outFile = parseFileName(options.fileName + '.' + mMeta.lang?.name, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 					tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
 					const dirName = path.dirname(tsFile);
 					if (!fs.existsSync(dirName)) {

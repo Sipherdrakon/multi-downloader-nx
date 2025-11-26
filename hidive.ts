@@ -868,7 +868,7 @@ export default class Hidive implements ServiceClass {
 			return undefined;
 		}
 
-		const fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
+		const fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 
 		console.info(`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudios[0].resolutionText}\n\tServer: ${selectedServer}`);
 		console.info(`Selected (Available) Audio Languages: ${chosenAudios.map((a) => a.language.name).join(', ')}`);
@@ -895,7 +895,7 @@ export default class Hidive implements ServiceClass {
 			const mathMsg = `(${mathParts}*${options.partsize})`;
 			console.info('Total parts in video stream:', totalParts, mathMsg);
 			const tsFile = path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.content, fileName);
-			const tempFile = parseFileName(`temp-${selectedEpisode.id}`, variables, options.numbers, options.override).join(path.sep);
+			const tempFile = parseFileName(`temp-${selectedEpisode.id}`, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 			const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
 			const dirName = path.dirname(tsFile);
 			if (!fs.existsSync(dirName)) {
@@ -988,9 +988,9 @@ export default class Hidive implements ServiceClass {
 				const mathParts = Math.ceil(totalParts / options.partsize);
 				const mathMsg = `(${mathParts}*${options.partsize})`;
 				console.info('Total parts in audio stream:', totalParts, mathMsg);
-				const tempFile = parseFileName(`temp-${selectedEpisode.id}.${chosenAudioSegments.language.name}`, variables, options.numbers, options.override).join(path.sep);
+				const tempFile = parseFileName(`temp-${selectedEpisode.id}.${chosenAudioSegments.language.name}`, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 				const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
-				const outFile = parseFileName(options.fileName + '.' + chosenAudioSegments.language.name, variables, options.numbers, options.override).join(path.sep);
+				const outFile = parseFileName(options.fileName + '.' + chosenAudioSegments.language.name, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 				const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
 				const dirName = path.dirname(tsFile);
 				if (!fs.existsSync(dirName)) {

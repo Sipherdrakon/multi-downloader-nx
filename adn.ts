@@ -729,8 +729,8 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 						console.info(`Selected quality: ${Object.keys(plSelectedList).find((a) => plSelectedList[a] === selPlUrl)} @ ${plSelectedServer}`);
 						console.info('Stream URL:', selPlUrl);
 						// TODO check filename
-						fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
-						const outFile = parseFileName(options.fileName + '.' + audDub.name, variables, options.numbers, options.override).join(path.sep);
+						fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+						const outFile = parseFileName(options.fileName + '.' + audDub.name, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 						console.info(`Output filename: ${outFile}`);
 						const chunkPage = await this.req.getData(selPlUrl);
 						if (!chunkPage.ok || !chunkPage.res) {
@@ -786,7 +786,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 				}
 			} else if (options.novids) {
 				console.info('Downloading skipped!');
-				fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
+				fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 			}
 			await this.sleep(options.waittime);
 		}
@@ -813,8 +813,8 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 
 			if (compiledChapters.length > 0) {
 				try {
-					fileName = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
-					const outFile = parseFileName(options.fileName, variables, options.numbers, options.override).join(path.sep);
+					fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+					const outFile = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 					const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
 					const dirName = path.dirname(tsFile);
 					if (!fs.existsSync(dirName)) {

@@ -2,6 +2,7 @@ import path from 'path';
 import { AvailableFilenameVars } from './module.args';
 import { console } from './log';
 import Helper from './module.helper';
+import { loadCfg } from './module.cfg-loader';
 
 export type Variable<T extends string = AvailableFilenameVars> = (
 	| {
@@ -24,8 +25,19 @@ const parseFileName = (
 	override: string[],
 	audioLanguages: string[] = [],
 	subtitleLanguages: string[] = [],
-	ccTag: string = 'cc'
+	ccTag: string = 'cc',
+	baseDirLength?: number
 ): string[] => {
+	// Calculate base directory length if not provided
+	if (baseDirLength === undefined) {
+		try {
+			const cfg = loadCfg();
+			baseDirLength = cfg.dir.content ? cfg.dir.content.length : 0;
+		} catch {
+			// Fallback to conservative estimate if config can't be loaded
+			baseDirLength = 100; // Conservative estimate for typical directory paths
+		}
+	}
 	const varRegex = /\${[A-Za-z1-9]+}/g;
 	const vars = input.match(varRegex);
 	const overridenVars = parseOverride(variables, override);
@@ -67,36 +79,47 @@ const parseFileName = (
 			titleValue = Helper.cleanupFilename(titleValue);
 		}
 
-		// Calculate the maximum length available for the title
-		const maxLength = process.platform === 'win32' ? 260 : 4096;
+		// Count how many ${title} variables exist in the template
+		const titleVarRegex = /\$\{title\}/g;
+		const titleMatches = input.match(titleVarRegex);
+		const titleCount = titleMatches ? titleMatches.length : 0;
 
-		// Calculate the exact suffix length needed for this specific download
-		const potentialSuffixLength = Helper.calculateSuffixLength(audioLanguages, subtitleLanguages, ccTag);
-		const effectiveMaxLength = maxLength - potentialSuffixLength;
+		if (titleCount > 0) {
+			// Calculate the maximum length available for the title
+			// Account for the base directory path that will be prepended
+			const maxLength = process.platform === 'win32' ? 260 : 4096;
+			const maxFilenameLength = maxLength - baseDirLength - 1; // -1 for path separator
 
-		// Check if truncation is needed
-		const templateWithTitle = input.replace('${title}', titleValue);
-		const pathCheck = Helper.checkPathLength(templateWithTitle);
+			// Calculate the exact suffix length needed for this specific download
+			const potentialSuffixLength = Helper.calculateSuffixLength(audioLanguages, subtitleLanguages, ccTag);
+			const effectiveMaxLength = maxFilenameLength - potentialSuffixLength;
 
-		if (!pathCheck.isValid || templateWithTitle.length > effectiveMaxLength) {
-			// Calculate how much space we have for the title
-			const templateWithoutTitle = input.replace('${title}', '');
-			const availableSpace = effectiveMaxLength - templateWithoutTitle.length;
+			// Check if truncation is needed - replace all occurrences for accurate length calculation
+			const templateWithTitle = input.replace(titleVarRegex, titleValue);
+			const fullPathLength = baseDirLength + 1 + templateWithTitle.length; // +1 for path separator
+			const pathCheck = Helper.checkPathLength(templateWithTitle);
 
-			if (availableSpace > 10) {
-				// Leave some buffer
-				const maxTitleLength = availableSpace - 3; // -3 for "..."
-				if (titleValue.length > maxTitleLength) {
-					titleValue = titleValue.substring(0, maxTitleLength) + '...';
+			if (!pathCheck.isValid || fullPathLength > maxLength || templateWithTitle.length > effectiveMaxLength) {
+				// Calculate how much space we have for all title occurrences
+				const templateWithoutTitle = input.replace(titleVarRegex, '');
+				const totalTitleSpace = effectiveMaxLength - templateWithoutTitle.length;
+				const availableSpacePerTitle = Math.floor(totalTitleSpace / titleCount);
+
+				if (availableSpacePerTitle > 10) {
+					// Leave some buffer
+					const maxTitleLength = availableSpacePerTitle - 3; // -3 for "..."
+					if (titleValue.length > maxTitleLength) {
+						titleValue = titleValue.substring(0, maxTitleLength) + '...';
+					}
+				} else {
+					// Not enough space even for a short title, use fallback
+					titleValue = 'Episode';
 				}
-			} else {
-				// Not enough space even for a short title, use fallback
-				titleValue = 'Episode';
 			}
-		}
 
-		// Replace the title variable with the processed value
-		input = input.replace('${title}', titleValue);
+			// Replace all title variables with the processed value
+			input = input.replace(titleVarRegex, titleValue);
+		}
 	}
 
 	const cleanedParts = input.split(path.sep).map((a) => Helper.cleanupFilename(a));

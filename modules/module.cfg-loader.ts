@@ -131,6 +131,13 @@ const loadCfg = (): ConfigObject => {
 			defaultCfg.dir[key] = path.join(workingDir, defaultCfg.dir[key].replace(/^\${wdir}/, ''));
 		}
 	}
+	
+	// Process archive path if it exists (optional field)
+	if (defaultCfg.dir.archive && typeof defaultCfg.dir.archive === 'string') {
+		if (!path.isAbsolute(defaultCfg.dir.archive)) {
+			defaultCfg.dir.archive = path.join(workingDir, defaultCfg.dir.archive.replace(/^\${wdir}/, ''));
+		}
+	}
 	if (!fs.existsSync(defaultCfg.dir.content)) {
 		try {
 			fs.ensureDirSync(defaultCfg.dir.content);
