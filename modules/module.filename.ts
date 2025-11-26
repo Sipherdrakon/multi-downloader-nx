@@ -64,10 +64,14 @@ const parseFileName = (
 		if (use.type === 'number') {
 			const len = use.replaceWith.toFixed(0).length;
 			const replaceStr = len < numbers ? '0'.repeat(numbers - len) + use.replaceWith : use.replaceWith + '';
-			input = input.replace(type, replaceStr);
+			// Use regex with global flag to replace all occurrences
+			const varRegex = new RegExp(type.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+			input = input.replace(varRegex, replaceStr);
 		} else {
 			if (use.sanitize) use.replaceWith = Helper.cleanupFilename(use.replaceWith);
-			input = input.replace(type, use.replaceWith);
+			// Use regex with global flag to replace all occurrences
+			const varRegex = new RegExp(type.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+			input = input.replace(varRegex, use.replaceWith);
 		}
 	}
 

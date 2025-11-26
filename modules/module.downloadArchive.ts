@@ -4,7 +4,8 @@ import { ArgvType } from './module.app-args';
 import { workingDir, loadCfg } from './module.cfg-loader';
 
 // Use configured archive path if set, otherwise use default
-const getArchiveFile = (): string => {
+// Resolve dynamically to support config changes
+const getArchiveFilePath = (): string => {
 	const cfg = loadCfg();
 	if (cfg.dir.archive) {
 		// If path is relative, resolve it relative to workingDir
@@ -14,7 +15,18 @@ const getArchiveFile = (): string => {
 	return path.join(workingDir, 'config', 'archive.json');
 };
 
-export const archiveFile = getArchiveFile();
+// Export as getter that resolves dynamically each time it's accessed
+// This allows config changes to take effect without module reload
+export const archiveFile: string = (() => {
+	// Create a getter property using Object.defineProperty
+	const exportsObj = module.exports as any;
+	Object.defineProperty(exportsObj, 'archiveFile', {
+		get: getArchiveFilePath,
+		enumerable: true,
+		configurable: true
+	});
+	return getArchiveFilePath(); // Initial value for TypeScript
+})();
 
 export type ItemType = {
 	id: string;
@@ -102,7 +114,7 @@ const addToArchive = (
 			};
 		}
 	}
-	fs.writeFileSync(archiveFile, JSON.stringify(data, null, 4));
+	fs.writeFileSync(getArchiveFilePath(), JSON.stringify(data, null, 4));
 };
 
 const downloaded = (
@@ -138,7 +150,7 @@ const downloaded = (
 		if (alreadyData?.includes(ep)) continue;
 		alreadyData?.push(ep);
 	}
-	fs.writeFileSync(archiveFile, JSON.stringify(data, null, 4));
+	fs.writeFileSync(getArchiveFilePath(), JSON.stringify(data, null, 4));
 };
 
 const makeCommand = (service: 'crunchy' | 'hidive' | 'adn'): Partial<ArgvType>[] => {
@@ -169,7 +181,8 @@ const makeCommand = (service: 'crunchy' | 'hidive' | 'adn'): Partial<ArgvType>[]
 };
 
 const loadData = (): DataType => {
-	if (fs.existsSync(archiveFile)) return JSON.parse(fs.readFileSync(archiveFile).toString()) as DataType;
+	const archivePath = getArchiveFilePath();
+	if (fs.existsSync(archivePath)) return JSON.parse(fs.readFileSync(archivePath).toString()) as DataType;
 	return {} as DataType;
 };
 
