@@ -102,7 +102,12 @@ const addToArchive = (
 			};
 		}
 	}
-	fs.writeFileSync(getArchiveFilePath(), JSON.stringify(data, null, 4));
+	const archivePath = getArchiveFilePath();
+	const archiveDir = path.dirname(archivePath);
+	if (!fs.existsSync(archiveDir)) {
+		fs.mkdirSync(archiveDir, { recursive: true });
+	}
+	fs.writeFileSync(archivePath, JSON.stringify(data, null, 4));
 };
 
 const downloaded = (
@@ -138,7 +143,12 @@ const downloaded = (
 		if (alreadyData?.includes(ep)) continue;
 		alreadyData?.push(ep);
 	}
-	fs.writeFileSync(getArchiveFilePath(), JSON.stringify(data, null, 4));
+	const archivePath = getArchiveFilePath();
+	const archiveDir = path.dirname(archivePath);
+	if (!fs.existsSync(archiveDir)) {
+		fs.mkdirSync(archiveDir, { recursive: true });
+	}
+	fs.writeFileSync(archivePath, JSON.stringify(data, null, 4));
 };
 
 const makeCommand = (service: 'crunchy' | 'hidive' | 'adn'): Partial<ArgvType>[] => {

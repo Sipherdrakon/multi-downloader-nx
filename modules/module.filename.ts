@@ -28,14 +28,25 @@ const parseFileName = (
 	ccTag: string = 'cc',
 	baseDirLength?: number
 ): string[] => {
-	// Calculate base directory length if not provided
+	// Calculate base directory length and path if not provided
+	let baseDirPath = '';
 	if (baseDirLength === undefined) {
 		try {
 			const cfg = loadCfg();
-			baseDirLength = cfg.dir.content ? cfg.dir.content.length : 0;
+			baseDirPath = cfg.dir.content || '';
+			baseDirLength = baseDirPath.length;
 		} catch {
 			// Fallback to conservative estimate if config can't be loaded
 			baseDirLength = 100; // Conservative estimate for typical directory paths
+		}
+	} else {
+		// If baseDirLength is provided, we still need the actual path for validation
+		try {
+			const cfg = loadCfg();
+			baseDirPath = cfg.dir.content || '';
+		} catch {
+			// If we can't get the path, use a placeholder of the correct length
+			baseDirPath = 'x'.repeat(baseDirLength);
 		}
 	}
 	const varRegex = /\${[A-Za-z1-9]+}/g;
@@ -101,7 +112,9 @@ const parseFileName = (
 			// Check if truncation is needed - replace all occurrences for accurate length calculation
 			const templateWithTitle = input.replace(titleVarRegex, titleValue);
 			const fullPathLength = baseDirLength + 1 + templateWithTitle.length; // +1 for path separator
-			const pathCheck = Helper.checkPathLength(templateWithTitle);
+			// Pass the full path (directory + filename) to checkPathLength for proper validation
+			const fullPath = baseDirPath ? path.join(baseDirPath, templateWithTitle) : templateWithTitle;
+			const pathCheck = Helper.checkPathLength(fullPath);
 
 			if (!pathCheck.isValid || fullPathLength > maxLength || templateWithTitle.length > effectiveMaxLength) {
 				// Calculate how much space we have for all title occurrences

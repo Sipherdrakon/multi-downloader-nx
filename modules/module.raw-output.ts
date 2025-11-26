@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import path from 'path';
 import { console } from './log';
 
 export interface RawOutputOptions {
@@ -30,6 +31,10 @@ export class RawOutputManager {
 				description: description || `${dataType} data from ${service}`,
 				data
 			};
+
+			// Ensure parent directory exists before writing
+			const outputDir = path.dirname(outputPath);
+			await fs.mkdir(outputDir, { recursive: true });
 
 			await fs.writeFile(outputPath, JSON.stringify(rawData, null, 2), { encoding: 'utf-8' });
 			console.info(`Raw ${dataType} data exported to ${outputPath}`);
