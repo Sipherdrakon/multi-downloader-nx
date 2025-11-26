@@ -3,6 +3,7 @@ import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import childProcess from 'child_process';
 import { console } from './log';
+import { languages } from './module.langsData';
 
 export default class Helper {
 	static async question(q: string) {
@@ -26,7 +27,7 @@ export default class Helper {
 	static cleanupFilename(n: string) {
 		/* eslint-disable no-extra-boolean-cast, no-useless-escape, no-control-regex */
 		const fixingChar = '_';
-		const illegalRe = /[\/\?<>\\:\*\|":]/g;
+		const illegalRe = /[\/\?<>\\:\*\|"]/g;
 		const controlRe = /[\x00-\x1f\x80-\x9f]/g;
 		const reservedRe = /^\.+$/;
 		const windowsReservedRe = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
@@ -69,9 +70,6 @@ export default class Helper {
 		if (audioLanguages.length === 0 && subtitleLanguages.length === 0) {
 			return 0;
 		}
-
-		// Import languages here to avoid circular dependency
-		const { languages } = require('./module.langsData');
 
 		// Find the longest language names and codes that will actually be used
 		const usedLanguages = [...new Set([...audioLanguages, ...subtitleLanguages])];
