@@ -97,7 +97,7 @@ export { ignore };
 		if (item.stats.isDirectory()) {
 			if (!fs.existsSync(itemPath)) fs.mkdirSync(itemPath, { recursive: true });
 		} else {
-			fs.cpSync(item.path, itemPath, { recursive: true });
+			fs.copyFileSync(item.path, itemPath);
 		}
 	});
 
