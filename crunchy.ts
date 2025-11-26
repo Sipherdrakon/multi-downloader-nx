@@ -109,10 +109,10 @@ export default class Crunchy implements ServiceClass {
 			await this.getNewlyAdded(argv.page, (argv.searchType || argv['search-type']) as string, argv.raw, argv.rawoutput);
 		} else if (argv.search && argv.search.length > 2) {
 			await this.refreshToken();
-			const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
 			
 			// Handle raw output for search
 			if (RawOutputManager.shouldOutputRaw(argv)) {
+				const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
 				await RawOutputManager.saveRawOutput({
 					service: 'crunchy',
 					data: searchResults,
@@ -121,6 +121,9 @@ export default class Crunchy implements ServiceClass {
 					description: `Search results for "${argv.search}"`
 				});
 				return;
+			} else {
+				// Normal search - doSearch() displays results internally
+				await this.doSearch({ ...argv, search: argv.search as string });
 			}
 		} else if (argv.series && argv.series.match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();

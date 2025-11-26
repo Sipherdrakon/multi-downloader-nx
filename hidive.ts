@@ -75,10 +75,9 @@ export default class Hidive implements ServiceClass {
 				password: argv.password ?? (await Helper.question('[Q] PASSWORD: '))
 			});
 		} else if (argv.search && argv.search.length > 2) {
-			const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
-			
 			// Handle raw output for search
 			if (RawOutputManager.shouldOutputRaw(argv)) {
+				const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
 				await RawOutputManager.saveRawOutput({
 					service: 'hidive',
 					data: searchResults,
@@ -87,6 +86,9 @@ export default class Hidive implements ServiceClass {
 					description: `Search results for "${argv.search}"`
 				});
 				return;
+			} else {
+				// Normal search - doSearch() displays results internally
+				await this.doSearch({ ...argv, search: argv.search as string });
 			}
 		} else if (argv.s && !isNaN(parseInt(argv.s, 10)) && parseInt(argv.s, 10) > 0) {
 			const selected = await this.selectSeason(parseInt(argv.s), argv.e, argv.but, argv.all);

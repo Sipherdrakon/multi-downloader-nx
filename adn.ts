@@ -82,10 +82,9 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			});
 		} else if (argv.search && argv.search.length > 2) {
 			//Search
-			const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
-			
 			// Handle raw output for search
 			if (RawOutputManager.shouldOutputRaw(argv)) {
+				const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
 				await RawOutputManager.saveRawOutput({
 					service: 'adn',
 					data: searchResults,
@@ -94,6 +93,9 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 					description: `Search results for "${argv.search}"`
 				});
 				return;
+			} else {
+				// Normal search - doSearch() displays results internally
+				await this.doSearch({ ...argv, search: argv.search as string });
 			}
 		} else if (argv.s && !isNaN(parseInt(argv.s, 10)) && parseInt(argv.s, 10) > 0) {
 			const selected = await this.selectShow(parseInt(argv.s), argv.e, argv.but, argv.all);
