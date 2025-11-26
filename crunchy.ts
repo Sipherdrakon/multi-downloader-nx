@@ -1550,6 +1550,109 @@ export default class Crunchy implements ServiceClass {
 		}
 	}
 
+	/**
+	 * Attempts to get evs3 manifest with 1080p quality when static manifest only provides lower quality
+	 * @returns Updated stream data if evs3 provides 1080p, null otherwise
+	 */
+	private async tryEvs3For1080p(
+		mediaId: string,
+		currentStaticUrl: string,
+		currentMaxQuality: number,
+		authHeaders: FetchParams,
+		audioLocale: string,
+		serverIndex: number
+	): Promise<{
+		stream: CrunchyPlayStream;
+		playlists: any;
+		servers: string[];
+		videos: any[];
+		audios: any[];
+	} | null> {
+		if (currentMaxQuality >= 1080 || !currentStaticUrl.includes('/static/')) {
+			return null; // Already has 1080p or not a static manifest
+		}
+
+		try {
+			console.warn('[WARN] 1080p not available (max %sp) from static manifest. Trying evs3 endpoint for 1080p...', currentMaxQuality);
+
+			const crPlayServiceReq = await this.req.getData(
+				`https://cr-play-service.prd.crunchyrollsvc.com/v1/${mediaId}/tv/android_tv/play`,
+				authHeaders
+			);
+
+			if (!crPlayServiceReq.ok || !crPlayServiceReq.res) {
+				return null;
+			}
+
+			const crPlayServiceStream = (await crPlayServiceReq.res.json()) as CrunchyPlayStream;
+
+			if (!crPlayServiceStream.url || !crPlayServiceStream.url.includes('/evs3/')) {
+				return null;
+			}
+
+			console.info('[INFO] Found evs3 manifest, checking for 1080p...');
+
+			// Fetch and parse evs3 manifest
+			const evs3PlaylistsReq = await this.req.getData(crPlayServiceStream.url, authHeaders);
+			if (!evs3PlaylistsReq.ok || !evs3PlaylistsReq.res) {
+				return null;
+			}
+
+			const evs3PlaylistBody = await evs3PlaylistsReq.res.text();
+			if (!evs3PlaylistBody.match('MPD')) {
+				return null;
+			}
+
+			const evs3Playlists = await parse(
+				evs3PlaylistBody,
+				langsData.findLang(langsData.fixLanguageTag(audioLocale) || ''),
+				crPlayServiceStream.url.match(/.*\.urlset\//)?.[0]
+			);
+
+			const evs3Servers = Object.keys(evs3Playlists);
+			if (evs3Servers.length === 0) {
+				return null;
+			}
+
+			const evs3SelectedServer = evs3Servers[serverIndex - 1] || evs3Servers[0];
+			const evs3SelectedList = evs3Playlists[evs3SelectedServer];
+
+			const evs3Videos = evs3SelectedList.video.map((item) => {
+				return {
+					...item,
+					resolutionText: `${item.quality.width}x${item.quality.height} (${Math.round(item.bandwidth / 1024)}KiB/s)`
+				};
+			});
+
+			const evs3MaxQuality = evs3Videos.length > 0 ? Math.max(...evs3Videos.map((v) => v.quality.height)) : 0;
+
+			if (evs3MaxQuality >= 1080) {
+				const evs3Audios = evs3SelectedList.audio.map((item) => {
+					return {
+						...item,
+						resolutionText: `${Math.round(item.bandwidth / 1000)}kB/s`
+					};
+				});
+
+				console.info('[INFO] Using evs3 manifest with %sp quality (was %sp)', evs3MaxQuality, currentMaxQuality);
+
+				return {
+					stream: crPlayServiceStream,
+					playlists: evs3Playlists,
+					servers: evs3Servers,
+					videos: evs3Videos.sort((a, b) => a.quality.width - b.quality.width),
+					audios: evs3Audios.sort((a, b) => a.bandwidth - b.bandwidth)
+				};
+			} else {
+				console.warn('[WARN] evs3 manifest also only has %sp max quality', evs3MaxQuality);
+				return null;
+			}
+		} catch (err) {
+			console.warn('[WARN] Failed to get evs3 manifest: %s', err instanceof Error ? err.message : String(err));
+			return null;
+		}
+	}
+
 	public async downloadMediaList(
 		medias: CrunchyEpMeta,
 		options: CrunchyDownloadOptions
@@ -2117,38 +2220,99 @@ export default class Crunchy implements ServiceClass {
 						const vstreamServers = Object.keys(vstreamPlaylists);
 						const astreamServers = Object.keys(astreamPlaylists);
 
-						options.x = options.x > vstreamServers.length ? 1 : options.x;
+					options.x = options.x > vstreamServers.length ? 1 : options.x;
 
-						const vselectedServer = vstreamServers[options.x - 1];
-						const vselectedList = vstreamPlaylists[vselectedServer];
+					let vselectedServer = vstreamServers[options.x - 1];
+					let vselectedList = vstreamPlaylists[vselectedServer];
 
-						const aselectedServer = astreamServers[options.x - 1];
-						const aselectedList = astreamPlaylists[aselectedServer];
+					let aselectedServer = astreamServers[options.x - 1];
+					let aselectedList = astreamPlaylists[aselectedServer];
 
-						//set Video Qualities
-						const videos = vselectedList.video.map((item) => {
-							return {
-								...item,
-								resolutionText: `${item.quality.width}x${item.quality.height} (${Math.round(item.bandwidth / 1024)}KiB/s)`
+					//set Video Qualities
+					const videos = vselectedList.video.map((item) => {
+						return {
+							...item,
+							resolutionText: `${item.quality.width}x${item.quality.height} (${Math.round(item.bandwidth / 1024)}KiB/s)`
+						};
+					});
+
+					const audios = aselectedList.audio.map((item) => {
+						return {
+							...item,
+							resolutionText: `${Math.round(item.bandwidth / 1000)}kB/s`
+						};
+					});
+
+					videos.sort((a, b) => {
+						return a.quality.width - b.quality.width;
+					});
+
+					audios.sort((a, b) => {
+						return a.bandwidth - b.bandwidth;
+					});
+
+					// Check if 1080p is not available - if so, try evs3 manifest for better quality
+					const maxQuality = videos.length > 0 ? videos[videos.length - 1].quality.height : 0;
+					if (maxQuality < 1080 && vcurStream.url.includes('/static/')) {
+						const evs3Result = await this.tryEvs3For1080p(
+							currentVersion ? currentVersion.guid : currentMediaId,
+							vcurStream.url,
+							maxQuality,
+							AuthHeaders,
+							pbData.meta.audio_locale as string,
+							options.x
+						);
+
+						if (evs3Result) {
+							// Update streams and metadata with evs3 data
+							videoStream = evs3Result.stream;
+							if (audioStream && audioStream.token !== evs3Result.stream.token) {
+								audioStream = evs3Result.stream;
+							}
+
+							// Update pbData.meta with evs3 subtitle/caption info
+							const evs3Captions = evs3Result.stream.captions || {};
+							const evs3Subtitles = evs3Result.stream.subtitles || {};
+							pbData.meta = {
+								...pbData.meta,
+								audio_locale: evs3Result.stream.audioLocale,
+								bifs: [evs3Result.stream.bifs],
+								captions: evs3Captions,
+								closed_captions: evs3Captions,
+								media_id: evs3Result.stream.assetId,
+								subtitles: evs3Subtitles,
+								versions: evs3Result.stream.versions
 							};
-						});
 
-						const audios = aselectedList.audio.map((item) => {
-							return {
-								...item,
-								resolutionText: `${Math.round(item.bandwidth / 1000)}kB/s`
-							};
-						});
+							// Update stream URLs and playlists
+							vcurStream.url = evs3Result.stream.url;
+							acurStream.url = evs3Result.stream.url;
+							vstreamServers.splice(0, vstreamServers.length, ...evs3Result.servers);
+							astreamServers.splice(0, astreamServers.length, ...evs3Result.servers);
 
-						videos.sort((a, b) => {
-							return a.quality.width - b.quality.width;
-						});
+							// Adjust server index if needed for evs3 servers
+							options.x = options.x > evs3Result.servers.length ? 1 : options.x;
+							const evs3SelectedServer = evs3Result.servers[options.x - 1] || evs3Result.servers[0];
 
-						audios.sort((a, b) => {
-							return a.bandwidth - b.bandwidth;
-						});
+							vselectedServer = evs3SelectedServer;
+							vselectedList = evs3Result.playlists[evs3SelectedServer];
+							aselectedServer = evs3SelectedServer;
+							aselectedList = evs3Result.playlists[evs3SelectedServer];
 
-						let chosenVideoQuality = options.q === 0 ? videos.length : options.q;
+							videos.splice(0, videos.length, ...evs3Result.videos);
+							audios.splice(0, audios.length, ...evs3Result.audios);
+
+							// Log subtitle info
+							if (Object.keys(evs3Captions).length > 0) {
+								console.info('[INFO] Updated captions from evs3: %d CC tracks', Object.keys(evs3Captions).length);
+							}
+							if (Object.keys(evs3Subtitles).length > 0) {
+								console.info('[INFO] Updated subtitles from evs3: %d tracks', Object.keys(evs3Subtitles).length);
+							}
+						}
+					}
+
+					let chosenVideoQuality = options.q === 0 ? videos.length : options.q;
 						if (chosenVideoQuality > videos.length) {
 							console.warn(
 								`The requested quality of ${options.q} is greater than the maximum ${videos.length}.\n[WARN] Therefor the maximum will be capped at ${videos.length}.`
