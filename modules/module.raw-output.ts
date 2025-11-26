@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import { console } from './log';
 
 export interface RawOutputOptions {

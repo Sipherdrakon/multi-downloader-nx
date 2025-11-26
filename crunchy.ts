@@ -381,11 +381,13 @@ export default class Crunchy implements ServiceClass {
 				if (fs.existsSync(fontLoc) && fs.statSync(fontLoc).size == 0) {
 					fs.rmSync(fontLoc, { recursive: true, force: true });
 				}
-				try {
-					fs.existsSync(fontFolder);
-				} catch (e) {
-					console.info('');
+			try {
+				if (!fs.existsSync(fontFolder)) {
+					fs.mkdirSync(fontFolder, { recursive: true });
 				}
+			} catch (e) {
+				console.info('');
+			}
 				const fontUrl = fontsData.root + f;
 				const getFont = await this.req.getData(fontUrl, {
 					headers: api.crunchyDefHeader

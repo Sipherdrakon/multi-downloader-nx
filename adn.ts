@@ -679,8 +679,8 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 						} else {
 							plStreams[plServer][plResolutionText] = pl.uri;
 						}
-						// set plQualityStr
-						const plBandwidth = Math.round(pl.attributes?.BANDWIDTH ?? 0 / 1024);
+					// set plQualityStr
+					const plBandwidth = Math.round((pl.attributes?.BANDWIDTH ?? 0) / 1024);
 						const qualityStrAdd = `${plResolutionText} (${plBandwidth}KiB/s)`;
 						const qualityStrRegx = new RegExp(qualityStrAdd.replace(/([:()/])/g, '\\$1'), 'm');
 						const qualityStrMatch = !plQuality
