@@ -106,7 +106,7 @@ export default class Crunchy implements ServiceClass {
 			await this.getCmsData();
 		} else if (argv.new) {
 			await this.refreshToken();
-			await this.getNewlyAdded(argv.page, argv['search-type'], argv.raw, argv.rawoutput);
+			await this.getNewlyAdded(argv.page, (argv.searchType || argv['search-type']) as string, argv.raw, argv.rawoutput);
 		} else if (argv.search && argv.search.length > 2) {
 			await this.refreshToken();
 			const searchResults = await this.doSearch({ ...argv, search: argv.search as string });
@@ -149,16 +149,16 @@ export default class Crunchy implements ServiceClass {
 				}
 			}
 			return true;
-		} else if (argv['movie-listing'] && argv['movie-listing'].match(/^[0-9A-Z]{9,}$/)) {
+		} else if ((argv.movieListing || argv['movie-listing']) && String(argv.movieListing || argv['movie-listing']).match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();
-			await this.logMovieListingById(argv['movie-listing'] as string);
-		} else if (argv['show-raw'] && argv['show-raw'].match(/^[0-9A-Z]{9,}$/)) {
+			await this.logMovieListingById((argv.movieListing || argv['movie-listing']) as string);
+		} else if ((argv.showRaw || argv['show-raw']) && String(argv.showRaw || argv['show-raw']).match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();
-			await this.logShowRawById(argv['show-raw'] as string);
-		} else if (argv['season-raw'] && argv['season-raw'].match(/^[0-9A-Z]{9,}$/)) {
+			await this.logShowRawById((argv.showRaw || argv['show-raw']) as string);
+		} else if ((argv.seasonRaw || argv['season-raw']) && String(argv.seasonRaw || argv['season-raw']).match(/^[0-9A-Z]{9,}$/)) {
 			await this.refreshToken();
-			await this.logSeasonRawById(argv['season-raw'] as string);
-		} else if (argv['show-list-raw']) {
+			await this.logSeasonRawById((argv.seasonRaw || argv['season-raw']) as string);
+		} else if (argv.showListRaw || argv['show-list-raw'] || argv.slraw) {
 			await this.refreshToken();
 			await this.logShowListRaw();
 		} else if (argv.s && argv.s.match(/^[0-9A-Z]{9,}$/)) {
@@ -700,7 +700,7 @@ export default class Crunchy implements ServiceClass {
 			q: data.search,
 			n: '5',
 			start: data.page ? `${(data.page - 1) * 5}` : '0',
-			type: data['search-type'] ?? getDefault('search-type', this.cfg.cli),
+			type: ((data as any).searchType || data['search-type']) ?? getDefault('search-type', this.cfg.cli),
 			locale: this.locale
 		}).toString();
 		const searchReq = await this.req.getData(`${api.search}?${searchParams}`, searchReqOpts);
