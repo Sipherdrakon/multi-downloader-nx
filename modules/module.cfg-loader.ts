@@ -86,7 +86,6 @@ export type ConfigObject = {
 	bin: {
 		ffmpeg?: string;
 		mkvmerge?: string;
-		ffprobe?: string;
 		mp4decrypt?: string;
 		shaka?: string;
 	};
@@ -159,7 +158,6 @@ const loadBinCfg = async () => {
 	const defaultBin = {
 		ffmpeg: 'ffmpeg',
 		mkvmerge: 'mkvmerge',
-		ffprobe: 'ffprobe',
 		mp4decrypt: 'mp4decrypt',
 		shaka: 'shaka-packager'
 	};

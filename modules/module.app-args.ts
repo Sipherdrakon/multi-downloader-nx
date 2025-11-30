@@ -32,13 +32,13 @@ export let argvC: {
 	auth: boolean | undefined;
 	dlFonts: boolean | undefined;
 	search: string | undefined;
-	'search-type': string;
+	searchType: string;
 	page: number | undefined;
 	locale: string;
 	new: boolean | undefined;
-	'movie-listing': string | undefined;
-	'show-raw': string | undefined;
-	'season-raw': string | undefined;
+	movieListing: string | undefined;
+	showRaw: string | undefined;
+	seasonRaw: string | undefined;
 	series: string | undefined;
 	s: string | undefined;
 	srz: string | undefined;
@@ -95,6 +95,7 @@ export let argvC: {
 	scaledBorderAndShadowFix: boolean;
 	scaledBorderAndShadow: 'yes' | 'no';
 	originalScriptFix: boolean;
+	subtitleTimestampFix: boolean;
 	// Proxy
 	proxy: string;
 	proxyAll: boolean;
@@ -105,14 +106,34 @@ export type ArgvType = typeof argvC;
 // This functions manages slight mismatches like -srz and returns it as --srz
 const processArgv = () => {
 	const argv = [];
-	for (const arg of process.argv) {
+	const arrayFlags = args.filter((a) => a.type === 'array').map((a) => `--${a.name}`);
+
+	for (let i = 0; i < process.argv.length; i++) {
+		const arg = process.argv[i];
+
 		if (/^-[a-zA-Z]{2,}$/.test(arg)) {
-			const name = args.find((a) => a.name === arg.substring(1) || a.alias === arg.substring(1));
-			if (name) {
-				argv.push(`--${name.name ?? name.alias}`);
+			const found = args.find((a) => a.name === arg.substring(1) || a.alias === arg.substring(1));
+			if (found) {
+				argv.push(`--${found.name}`);
 				continue;
 			}
 		}
+
+		if (arrayFlags.includes(arg)) {
+			const col = [];
+			let n = i + 1;
+
+			while (n < process.argv.length && !process.argv[n].startsWith('-')) {
+				col.push(process.argv[n]);
+				n++;
+			}
+
+			argv.push(arg);
+			argv.push(col.join(' '));
+			i = n - 1;
+			continue;
+		}
+
 		argv.push(arg);
 	}
 
@@ -161,9 +182,9 @@ const overrideArguments = (cfg: { [key: string]: unknown }, override: Partial<ty
 	for (const [key, val] of Object.entries(override)) {
 		if (val === undefined) continue;
 		if (typeof val === 'boolean') {
-			if (val) baseArgv.push(`--${key}`);
+			if (val) baseArgv.push(key.length > 1 ? `--${key}` : `-${key}`);
 		} else {
-			baseArgv.push(`--${key}`, String(val));
+			baseArgv.push(key.length > 1 ? `--${key}` : `-${key}`, String(val));
 		}
 	}
 
@@ -229,9 +250,16 @@ const getCommander = (cfg: Record<string, unknown>, isGUI: boolean) => {
 					: `--${item.name}`) + (item.type === 'boolean' ? '' : ` <value>`),
 			item.describe ?? ''
 		);
-		if (item.default !== undefined) option.default(item.default);
+		if (item.default !== undefined) option.default(item.transformer ? item.transformer(item.default) : item.default);
+
+		const optionNames = [...args.map((a) => `--${a.name}`), ...args.map((a) => (a.alias ? `-${a.alias}` : null)).filter(Boolean)];
 
 		option.argParser((value) => {
+			if (item.transformer) return item.transformer(value);
+
+			// Prevent from passing other options als value for option
+			if (value && typeof value === 'string' && value.startsWith('-') && optionNames.includes(value)) return undefined;
+
 			if (item.type === 'boolean') {
 				if (value === undefined) return true;
 				if (value === 'true') return true;
@@ -240,10 +268,25 @@ const getCommander = (cfg: Record<string, unknown>, isGUI: boolean) => {
 			}
 
 			if (item.type === 'array') {
-				if (typeof value === 'string') {
+				if (typeof value === 'string' && value.includes(',')) {
 					return value.split(',').map((v) => v.trim());
 				}
+
+				if (typeof value === 'string' && value.includes(' ')) {
+					return value.split(' ').map((v) => v.trim());
+				}
+
 				return Array.isArray(value) ? value : [value];
+			}
+
+			if (item.type === 'number') {
+				const num = Number(value);
+				return Number.isFinite(num) ? num : 0;
+			}
+
+			if (item.type === 'string') {
+				if (value === undefined) return undefined;
+				return value;
 			}
 
 			if (item.choices && !(isGUI && item.name === 'service')) {
@@ -252,8 +295,6 @@ const getCommander = (cfg: Record<string, unknown>, isGUI: boolean) => {
 					process.exit(1);
 				}
 			}
-
-			if (item.transformer) return item.transformer(value);
 			return value;
 		});
 
