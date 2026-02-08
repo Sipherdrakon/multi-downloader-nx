@@ -1366,6 +1366,9 @@ export default class Crunchy implements ServiceClass {
 					if (extIdReq.error && extIdReq.error.res && extIdReq.error.res.body) {
 						console.info('[INFO] Body:', extIdReq.error.res.body);
 					}
+					if (extIdReq.error) {
+						console.info('[INFO] Error:', extIdReq.error);
+					}
 					continue;
 				}
 
@@ -1532,13 +1535,22 @@ export default class Crunchy implements ServiceClass {
 				}
 				selectedMedia.push(epMeta);
 				item.isSelected = true;
-			} else if (item.__links__) {
+			} else if (item.__links__ && item.__links__.streams) {
 				epMeta.data[0].playback = item.__links__.streams.href;
 				if (!item.playback) {
 					item.playback = item.__links__.streams.href;
 				}
 				selectedMedia.push(epMeta);
 				item.isSelected = true;
+			} else if (item.episode_metadata && item.episode_metadata.versions && item.episode_metadata.versions.length > 0) {
+				// Fallback: construct playback URL from version data
+				const version = item.episode_metadata.versions.find(v => v.audio_locale === 'en-US') || item.episode_metadata.versions[0];
+				if (version && version.guid) {
+					epMeta.data[0].playback = `https://cr-play-service.prd.crunchyrollsvc.com/v3/${version.guid}/androidtv/play`;
+					epMeta.data[0].mediaId = 'E:' + item.id;
+					selectedMedia.push(epMeta);
+					item.isSelected = true;
+				}
 			}
 			await this.logObject(item, 2);
 		}
@@ -1812,21 +1824,24 @@ export default class Crunchy implements ServiceClass {
 
 					//Make a format more usable for the crunchy chapters
 					for (const chapter in chapterData) {
-						if (typeof chapterData[chapter] == 'object') {
+						if (typeof chapterData[chapter] == 'object' && chapterData[chapter] != null) {
 							chapters.push(chapterData[chapter]);
 						}
 					}
 
-					if (chapters.length > 0) {
-						chapters.sort((a, b) => a.start - b.start);
+					// Filter out null chapters
+					const validChapters = chapters.filter(chapter => chapter != null);
+
+					if (validChapters.length > 0) {
+						validChapters.sort((a, b) => a.start - b.start);
 						//Check if chapters has an intro
 						//if (!(chapters.find(c => c.type === 'intro') || chapters.find(c => c.type === 'recap'))) {
-						if (!chapters.find((c) => c.type === 'intro')) {
+						if (!validChapters.find((c) => c.type === 'intro')) {
 							compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=00:00:00.00`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
 						}
 
 						//Loop through all the chapters
-						for (const chapter of chapters) {
+						for (const chapter of validChapters) {
 							if (typeof chapter.start == 'undefined' || typeof chapter.end == 'undefined') continue;
 							//Generate timestamps
 							const startTime = new Date(0),
@@ -1836,7 +1851,7 @@ export default class Crunchy implements ServiceClass {
 							const startFormatted = startTime.toISOString().substring(11, 19) + '.00';
 							const endFormatted = endTime.toISOString().substring(11, 19) + '.00';
 							//Find the max start time from the chapters
-							const maxStart = Math.max(...chapters.map((obj) => obj.start).filter((start): start is number => start !== null && start !== undefined));
+							const maxStart = Math.max(...validChapters.map((obj) => obj.start).filter((start): start is number => start !== null && start !== undefined));
 							//We need the duration of the ep
 							let epDuration: number | undefined;
 							const epiMeta = await this.req.getData(
