@@ -5,13 +5,15 @@ import { makeCommand, addToArchive } from './modules/module.downloadArchive';
 import Crunchy from './crunchy';
 import Hidive from './hidive';
 import ADN from './adn';
+import Oceanveil from './oceanveil';
 
 import update from './modules/module.updater';
 
 const SERVICES: Record<string, any> = {
 	crunchy: Crunchy,
 	hidive: Hidive,
-	adn: ADN
+	adn: ADN,
+	oceanveil: Oceanveil
 };
 
 (async () => {
