@@ -51,7 +51,7 @@ const EpisodeListing: React.FC = () => {
 				<FormControl sx={{ mr: 2, mt: 2 }}>
 					<InputLabel id="seasonSelectLabel">Season</InputLabel>
 					<Select labelId="seasonSelectLabel" label="Season" value={season} onChange={(e) => setSeason(e.target.value)}>
-						<MenuItem value="all">Show all Epsiodes</MenuItem>
+						<MenuItem value="all">Show all Episodes</MenuItem>
 						{seasons.map((a, index) => {
 							return (
 								<MenuItem value={a} key={`MenuItem_SeasonSelect_${index}`}>

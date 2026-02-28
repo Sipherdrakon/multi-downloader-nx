@@ -36,6 +36,14 @@ export let argvC: {
 	page: number | undefined;
 	locale: string;
 	new: boolean | undefined;
+	sfw: boolean;
+	genre: string | undefined;
+	tags: (string | number)[];
+	genreId: number | undefined;
+	tagIds: (string | number)[] | undefined;
+	listTags: boolean | undefined;
+	listGenres: boolean | undefined;
+	listFilters: boolean | undefined;
 	movieListing: string | undefined;
 	showRaw: string | undefined;
 	seasonRaw: string | undefined;
@@ -75,7 +83,7 @@ export let argvC: {
 	rawoutput: string;
 	nocleanup: boolean;
 	help: boolean | undefined;
-	service: 'crunchy' | 'hidive' | 'adn';
+	service: 'crunchy' | 'hidive' | 'adn' | 'oceanveil';
 	update: boolean;
 	fontName: string | undefined;
 	_: (string | number)[];

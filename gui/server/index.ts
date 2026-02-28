@@ -32,7 +32,12 @@ app.use((req, res, next) => {
 	next();
 });
 
-app.use(express.static(path.join(workingDir, 'gui', 'server', 'build'), { maxAge: 1000 * 60 * 20 }));
+// No caching for GUI bundle so updating the exe always shows the new UI (e.g. OceanVeil button)
+app.use((req, res, next) => {
+	res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+	next();
+});
+app.use(express.static(path.join(workingDir, 'gui', 'server', 'build')));
 
 console.info(`\n=== Multi Downloader NX GUI ${packageJson.version} ===\n`);
 

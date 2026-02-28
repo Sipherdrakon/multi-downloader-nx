@@ -4,7 +4,7 @@ If you find any bugs in this documentation or in the program itself please repor
 
 ## Legal Warning
 
-This application is not endorsed by or affiliated with *Crunchyroll*, *Hidive* or *AnimationDigitalNetwork*.
+This application is not endorsed by or affiliated with *Crunchyroll*, *Hidive*, *AnimationDigitalNetwork* or *OceanVeil*.
 This application enables you to download videos for offline viewing which may be forbidden by law in your country.
 The usage of this application may also cause a violation of the *Terms of Service* between you and the stream provider.
 This tool is not responsible for your actions; please make an informed decision before using this application.
@@ -13,6 +13,12 @@ This tool is not responsible for your actions; please make an informed decision 
 ### Legend
  - `${someText}` shows that you should replace this text with your own
     - e.g. `--username ${someText}` -> `--username Izuco`
+ - **Service** shows which provider(s) the option applies to:
+    - *All* = every service (Crunchyroll, Hidive, AnimationDigitalNetwork, OceanVeil)
+    - A single name (e.g. *Crunchyroll*, *OceanVeil*) = that service only
+    - Several names = those services only
+ - **OceanVeil** search filters: use `--search "<term>" --tags ...` / `--tag-ids ...` (tags are AND-ed by API). Example: `--search "bl" --tags yaoi` or `--search "isekai" --tag-ids 59 22`.
+- **OceanVeil** selectors: use `--srz <titleId>` and `-e <episodeNumberOrId>`; `-s` is optional and only season `1` is supported when provided (e.g. `--srz 337 -e 4` or `--srz 337 -s 1 -e 2100`).
 
 ### Authentication
 #### `--auth`
@@ -77,7 +83,7 @@ Search only for type of anime listings (e.g. episodes, series)
 #### `--page`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--page ${page}` | `number` | `No`| `-p` | `NaN` |
+| Crunchyroll, Hidive, OceanVeil | `--page ${page}` | `number` | `No`| `-p` | `NaN` |
 
 The output is organized in pages. Use this command to output the items for the given page
 #### `--locale`
@@ -89,9 +95,63 @@ Set the local that will be used for the API.
 #### `--new`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll, Hidive | `--new ` | `boolean` | `No`| `NaN` | `NaN` |
+| Crunchyroll, Hidive, OceanVeil | `--new ` | `boolean` | `No`| `NaN` | `NaN` |
 
 Get last updated series list
+#### `--sfw`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--sfw ` | `boolean` | `No`| `NaN` | `NaN` |
+
+When set, use the SFW catalog for search and new episodes (is_mature=false).
+#### `--genre`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--genre ${genreName}` | `string` | `No`| `NaN` | `NaN` |
+
+OceanVeil only. Genre name to filter search (e.g. --genre "Young Adult"). Resolved to ID via API when /genres is available.
+If no genre is resolved, search proceeds without a genre filter. Prefer --genre-id when you already know the numeric ID.
+#### `--genre-id`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--genre-id ${genreId}` | `number` | `No`| `NaN` | `NaN` |
+
+OceanVeil only. Use when you have the ID; otherwise use --genre <name>. Use --list-genres to see id→name.
+#### `--tags`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--tags ${tagNames}` | `array` | `No`| `NaN` | `NaN` |
+
+OceanVeil only. Tag names to filter search (e.g. --tags glasses harem).
+Names are resolved to IDs via API. Multiple tags are AND-ed by OceanVeil API (must match all selected tags).
+Use together with --search "<term>" (e.g. --search "bl" --tags yaoi).
+#### `--tag-ids`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--tag-ids ${tagIds}` | `array` | `No`| `NaN` | `NaN` |
+
+OceanVeil only. Use when you already know IDs; otherwise use --tags <name1> <name2>.
+Multiple IDs are AND-ed by OceanVeil API (must match all selected tags).
+Example: --search "isekai" --tag-ids 59 22
+#### `--list-tags`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--list-tags ` | `boolean` | `No`| `NaN` | `NaN` |
+
+OceanVeil only. Fetches and prints tag ID → name so you can use --tag-ids. Use --sfw for SFW catalog tags.
+#### `--list-genres`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--list-genres ` | `boolean` | `No`| `NaN` | `NaN` |
+
+OceanVeil only. Attempts to fetch and print genre ID → name for use with --genre-id.
+Note: API may return 404 for /genres on some catalogs/accounts. This command reports that condition and continues.
+#### `--list-filters`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| OceanVeil | `--list-filters ` | `boolean` | `No`| `NaN` | `NaN` |
+
+OceanVeil only. Boolean flag: when set, prints both --list-genres and --list-tags output. Use --sfw for SFW catalog.
 ### Downloading
 #### `--absolute`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
@@ -126,15 +186,20 @@ Get Raw Show list data
 #### `--series`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
-| Crunchyroll | `--series ${ID}` | `string` | `No`| `--srz` | `NaN` |
+| Crunchyroll, Hidive, OceanVeil | `--series ${ID}` | `string` | `No`| `--srz` | `NaN` |
 
-Requested is the ID of a show not a season.
+Requested is the ID of a show/series (not a season).
+- Hidive: matches Z.<id> search results
+- OceanVeil: title ID used with -e <episode>; optional -s 1
 #### `-s`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
 | All | `-s ${ID}` | `string` | `No`| `NaN` | `NaN` |
 
-Used to set the season ID to download from
+Service-specific selector:
+- Crunchyroll/Hidive/ADN: usually season ID
+- Hidive also supports series ID via --srz
+- OceanVeil: optional season selector (only season 1 supported when provided)
 #### `-e`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -143,6 +208,7 @@ Used to set the season ID to download from
 Set the episode(s) to download from any given show.
 For multiple selection: 1-4 OR 1,2,3,4 
 For special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter
+OceanVeil: accepts episode display number (e.g. 4) or API episode ID (e.g. 2100).
 #### `--extid`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -510,7 +576,7 @@ Debug mode (tokens may be revealed in the console output)
 #### `--service`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
-| All | `--service ${service}` | `string` | `Yes`| `NaN` | [`crunchy`, `hidive`, `adn`] | ``| `service: ` |
+| All | `--service ${service}` | `string` | `Yes`| `NaN` | [`crunchy`, `hidive`, `adn`, `oceanveil`] | ``| `service: ` |
 
 Set the service you want to use
 #### `--update`

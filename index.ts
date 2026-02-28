@@ -43,12 +43,19 @@ const SERVICES: Record<string, any> = {
 			addToArchive(
 				{
 					service: 'hidive',
-					//type: argv.s === undefined ? 'srz' : 's'
 					type: 's'
 				},
 				(argv.s === undefined ? argv.series : argv.s) as string
 			);
 			console.info('Added %s to the downloadArchive list', argv.s === undefined ? argv.series : argv.s);
+		} else if (argv.service === 'adn') {
+			if (argv.s === undefined) return console.error('`-s` not found');
+			addToArchive({ service: 'adn', type: 's' }, (argv.s === undefined ? argv.series : argv.s) as string);
+			console.info('Added %s to the downloadArchive list', argv.s === undefined ? argv.series : argv.s);
+		} else if (argv.service === 'oceanveil') {
+			if (argv.series === undefined) return console.error('`--srz` not found');
+			addToArchive({ service: 'oceanveil', type: 'srz' }, argv.series as string);
+			console.info('Added %s to the downloadArchive list', argv.series);
 		}
 	} else if (argv.downloadArchive && argv.service) {
 		const ids = makeCommand(argv.service);

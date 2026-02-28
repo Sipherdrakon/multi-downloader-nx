@@ -32,6 +32,9 @@ export type DataType = {
 		srz: ItemType;
 		s: ItemType;
 	};
+	oceanveil: {
+		srz: ItemType;
+	};
 };
 
 const addToArchive = (
@@ -47,14 +50,18 @@ const addToArchive = (
 		| {
 				service: 'adn';
 				type: 's';
+		  }
+		| {
+				service: 'oceanveil';
+				type: 'srz';
 		  },
 	ID: string
 ) => {
 	const data = loadData();
 
 	if (Object.prototype.hasOwnProperty.call(data, kind.service)) {
-		const items = kind.service === 'crunchy' ? data[kind.service][kind.type] : data[kind.service][kind.type];
-		if (items.findIndex((a) => a.id === ID) >= 0)
+		const items = ((data as any)[kind.service][kind.type] ?? []) as ItemType;
+		if (items.findIndex((a: { id: string }) => a.id === ID) >= 0)
 			// Prevent duplicate
 			return;
 		items.push({
@@ -91,6 +98,17 @@ const addToArchive = (
 					}
 				]
 			};
+		} else if (kind.service === 'oceanveil') {
+			data['oceanveil'] = {
+				srz: ([] as ItemType).concat(
+					kind.type === 'srz'
+						? {
+								id: ID,
+								already: []
+							}
+						: []
+				)
+			};
 		} else {
 			data['hidive'] = {
 				s: [
@@ -123,6 +141,10 @@ const downloaded = (
 		| {
 				service: 'adn';
 				type: 's';
+		  }
+		| {
+				service: 'oceanveil';
+				type: 'srz';
 		  },
 	ID: string,
 	episode: string[]
@@ -137,8 +159,8 @@ const downloaded = (
 		data = loadData(); // Load updated version
 	}
 
-	const archivedata = kind.service == 'crunchy' ? data[kind.service][kind.type] : data[kind.service][kind.type];
-	const alreadyData = archivedata.find((a) => a.id === ID)?.already;
+	const archivedata = (data as any)[kind.service][kind.type];
+	const alreadyData = archivedata.find((a: { id: string; already: string[] }) => a.id === ID)?.already;
 	for (const ep of episode) {
 		if (alreadyData?.includes(ep)) continue;
 		alreadyData?.push(ep);
@@ -151,13 +173,15 @@ const downloaded = (
 	fs.writeFileSync(archivePath, JSON.stringify(data, null, 4));
 };
 
-const makeCommand = (service: 'crunchy' | 'hidive' | 'adn'): Partial<ArgvType>[] => {
+const makeCommand = (service: 'crunchy' | 'hidive' | 'adn' | 'oceanveil'): Partial<ArgvType>[] => {
 	const data = loadData();
 	const ret: Partial<ArgvType>[] = [];
-	const kind = data[service];
+	const kind = (data as any)[service];
+	if (!kind) return ret;
 	for (const type of Object.keys(kind)) {
-		const item = kind[type as 's']; // 'srz' is also possible but will be ignored for the compiler
-		item.forEach((i) =>
+		if (service === 'oceanveil' && type !== 'srz') continue;
+		const item = (kind[type as 's'] ?? []) as ItemType;
+		item.forEach((i: { id: string; already: string[] }) =>
 			ret.push({
 				but: true,
 				all: false,

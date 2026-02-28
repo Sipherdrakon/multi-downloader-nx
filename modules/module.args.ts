@@ -35,7 +35,7 @@ export type TAppArg<T extends boolean | string | number | unknown[], K = any> = 
 				default: T | undefined;
 				name?: string;
 		  };
-	service: Array<'crunchy' | 'hidive' | 'adn' | 'all'>;
+	service: Array<'crunchy' | 'hidive' | 'adn' | 'oceanveil' | 'all'>;
 	usage: string; // -(-)${name} will be added for each command,
 	demandOption?: true;
 	transformer?: (value: T) => K;
@@ -101,7 +101,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		describe: 'Set the page number for search results',
 		docDescribe: 'The output is organized in pages. Use this command to output the items for the given page',
 		group: 'search',
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy', 'hidive', 'oceanveil'],
 		type: 'number',
 		usage: '${page}'
 	},
@@ -123,7 +123,90 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'new',
 		describe: 'Get last updated series list',
 		docDescribe: true,
-		service: ['crunchy', 'hidive'],
+		service: ['crunchy', 'hidive', 'oceanveil'],
+		type: 'boolean',
+		usage: ''
+	},
+	{
+		group: 'search',
+		name: 'sfw',
+		describe: 'OceanVeil: use SFW catalog (default is mature/NSFW)',
+		docDescribe: 'When set, use the SFW catalog for search and new episodes (is_mature=false).',
+		service: ['oceanveil'],
+		type: 'boolean',
+		default: false,
+		usage: ''
+	},
+	{
+		group: 'search',
+		name: 'genre',
+		describe: 'OceanVeil: genre by name (e.g. --genre mature) or use --genre-id for ID',
+		docDescribe:
+			'OceanVeil only. Genre name to filter search (e.g. --genre "Young Adult"). Resolved to ID via API when /genres is available.' +
+			'\nIf no genre is resolved, search proceeds without a genre filter. Prefer --genre-id when you already know the numeric ID.',
+		service: ['oceanveil'],
+		type: 'string',
+		usage: '${genreName}'
+	},
+	{
+		group: 'search',
+		name: 'genre-id',
+		describe: 'OceanVeil: genre by ID (e.g. 1–5) when you know the ID',
+		docDescribe: 'OceanVeil only. Use when you have the ID; otherwise use --genre <name>. Use --list-genres to see id→name.',
+		service: ['oceanveil'],
+		type: 'number',
+		usage: '${genreId}'
+	},
+	{
+		group: 'search',
+		name: 'tags',
+		describe: 'OceanVeil: tag names (e.g. --tags glasses harem) or use --tag-ids for IDs',
+		docDescribe:
+			'OceanVeil only. Tag names to filter search (e.g. --tags glasses harem).' +
+			'\nNames are resolved to IDs via API. Multiple tags are AND-ed by OceanVeil API (must match all selected tags).' +
+			'\nUse together with --search "<term>" (e.g. --search "bl" --tags yaoi).',
+		service: ['oceanveil'],
+		type: 'array',
+		usage: '${tagNames}'
+	},
+	{
+		group: 'search',
+		name: 'tag-ids',
+		describe: 'OceanVeil: tag IDs when you know them (space-separated)',
+		docDescribe:
+			'OceanVeil only. Use when you already know IDs; otherwise use --tags <name1> <name2>.' +
+			'\nMultiple IDs are AND-ed by OceanVeil API (must match all selected tags).' +
+			'\nExample: --search "isekai" --tag-ids 59 22',
+		service: ['oceanveil'],
+		type: 'array',
+		usage: '${tagIds}'
+	},
+	{
+		group: 'search',
+		name: 'list-tags',
+		describe: 'OceanVeil: print all tags with ID and name (for use with --tag-ids)',
+		docDescribe: 'OceanVeil only. Fetches and prints tag ID → name so you can use --tag-ids. Use --sfw for SFW catalog tags.',
+		service: ['oceanveil'],
+		type: 'boolean',
+		usage: ''
+	},
+	{
+		group: 'search',
+		name: 'list-genres',
+		describe: 'OceanVeil: print all genres with ID and name (for use with --genre-id)',
+		docDescribe:
+			'OceanVeil only. Attempts to fetch and print genre ID → name for use with --genre-id.' +
+			'\nNote: API may return 404 for /genres on some catalogs/accounts. This command reports that condition and continues.',
+		service: ['oceanveil'],
+		type: 'boolean',
+		usage: ''
+	},
+	{
+		group: 'search',
+		name: 'list-filters',
+		describe: 'OceanVeil: print both genres and tags (ID → name) in one go',
+		docDescribe: 'OceanVeil only. Boolean flag: when set, prints both --list-genres and --list-tags output. Use --sfw for SFW catalog.',
+		service: ['oceanveil'],
 		type: 'boolean',
 		usage: ''
 	},
@@ -172,8 +255,11 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'dl',
 		alias: 'srz',
 		describe: 'Get season list by series ID',
-		docDescribe: 'Requested is the ID of a show not a season.',
-		service: ['crunchy'],
+		docDescribe:
+			'Requested is the ID of a show/series (not a season).' +
+			'\n- Hidive: matches Z.<id> search results' +
+			'\n- OceanVeil: title ID used with -e <episode>; optional -s 1',
+		service: ['crunchy', 'hidive', 'oceanveil'],
 		type: 'string',
 		usage: '${ID}'
 	},
@@ -181,8 +267,12 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 's',
 		group: 'dl',
 		type: 'string',
-		describe: 'Set the season ID',
-		docDescribe: 'Used to set the season ID to download from',
+		describe: 'Set the primary content ID (service-specific)',
+		docDescribe:
+			'Service-specific selector:' +
+			'\n- Crunchyroll/Hidive/ADN: usually season ID' +
+			'\n- Hidive also supports series ID via --srz' +
+			'\n- OceanVeil: optional season selector (only season 1 supported when provided)',
 		service: ['all'],
 		usage: '${ID}'
 	},
@@ -193,7 +283,8 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		docDescribe:
 			'Set the episode(s) to download from any given show.' +
 			'\nFor multiple selection: 1-4 OR 1,2,3,4 ' +
-			'\nFor special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter',
+			'\nFor special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter' +
+			'\nOceanVeil: accepts episode display number (e.g. 4) or API episode ID (e.g. 2100).',
 		service: ['all'],
 		type: 'string',
 		usage: '${selection}',
@@ -737,7 +828,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		group: 'util',
 		service: ['all'],
 		type: 'string',
-		choices: ['crunchy', 'hidive', 'adn'],
+		choices: ['crunchy', 'hidive', 'adn', 'oceanveil'],
 		usage: '${service}',
 		default: {
 			default: ''

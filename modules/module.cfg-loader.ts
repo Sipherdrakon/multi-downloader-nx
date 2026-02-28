@@ -33,7 +33,8 @@ const tokenFile = {
 	cr: path.join(workingDir, 'config', 'cr_token'),
 	hd: path.join(workingDir, 'config', 'hd_token'),
 	hdNew: path.join(workingDir, 'config', 'hd_new_token'),
-	adn: path.join(workingDir, 'config', 'adn_token')
+	adn: path.join(workingDir, 'config', 'adn_token'),
+	oceanveil: path.join(workingDir, 'config', 'oceanveil_token')
 };
 
 export const ensureConfig = () => {
@@ -332,6 +333,24 @@ const saveNewHDToken = (data: Record<string, unknown>) => {
 	}
 };
 
+const loadOceanveilToken = () => {
+	let token = loadYamlCfgFile(tokenFile.oceanveil, true);
+	if (typeof token !== 'object' || token === null || Array.isArray(token)) {
+		token = {};
+	}
+	return token;
+};
+
+const saveOceanveilToken = (data: Record<string, unknown>) => {
+	const cfgFolder = path.dirname(tokenFile.oceanveil);
+	try {
+		fs.mkdirSync(cfgFolder, { recursive: true });
+		fs.writeFileSync(`${tokenFile.oceanveil}.yml`, yaml.stringify(data));
+	} catch (e) {
+		console.error("Can't save OceanVeil token file to disk!");
+	}
+};
+
 const cfgDir = path.join(workingDir, 'config');
 
 const getState = (): GuiState => {
@@ -377,6 +396,8 @@ export {
 	loadHDToken,
 	saveNewHDToken,
 	loadNewHDToken,
+	saveOceanveilToken,
+	loadOceanveilToken,
 	saveHDProfile,
 	loadHDProfile,
 	getState,
