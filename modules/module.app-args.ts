@@ -28,6 +28,9 @@ export let argvC: {
 	skipSubMux: boolean;
 	downloadArchive: boolean;
 	addArchive: boolean;
+	archive?: string;
+	removeArchive?: boolean;
+	archiveAddEpisodes?: string;
 	but: boolean;
 	auth: boolean | undefined;
 	dlFonts: boolean | undefined;

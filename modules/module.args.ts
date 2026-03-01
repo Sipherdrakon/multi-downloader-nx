@@ -881,6 +881,33 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: ''
 	},
 	{
+		name: 'archive',
+		describe: 'Path to archive file for this run (overrides config). Use different files for e.g. --downloadArchive per show.',
+		group: 'dl',
+		docDescribe: true,
+		service: ['all'],
+		type: 'string',
+		usage: '${path}'
+	},
+	{
+		name: 'removeArchive',
+		describe: 'Remove the given series/season from the archive (use with --service and -s or --srz).',
+		group: 'dl',
+		docDescribe: true,
+		service: ['all'],
+		type: 'boolean',
+		usage: ''
+	},
+	{
+		name: 'archiveAddEpisodes',
+		describe: 'Mark episodes as already in archive without downloading (e.g. "1,2,3" or "1-5"). Use with --service and -s or --srz.',
+		group: 'dl',
+		docDescribe: true,
+		service: ['all'],
+		type: 'string',
+		usage: '${episodeList}'
+	},
+	{
 		name: 'skipSubMux',
 		describe: 'Skip muxing the subtitles',
 		docDescribe: true,

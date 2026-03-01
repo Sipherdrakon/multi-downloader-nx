@@ -26,7 +26,7 @@ import * as reqModule from './modules/module.fetch';
 import { CrunchySearch } from './@types/crunchySearch';
 import { CrunchyEpisodeList, CrunchyEpisode } from './@types/crunchyEpisodeList';
 import { CrunchyDownloadOptions, CrunchyEpMeta, CrunchyMuxOptions, CrunchyMultiDownload, DownloadedMedia, ParseItem, SeriesSearch, SeriesSearchItem } from './@types/crunchyTypes';
-import { ObjectInfo } from './@types/objectInfo';
+import { CrunchyObject, ObjectInfo } from './@types/objectInfo';
 import parseFileName, { Variable } from './modules/module.filename';
 import { CrunchyStreams, PlaybackData } from './@types/playbackData';
 import { downloaded } from './modules/module.downloadArchive';
@@ -1739,6 +1739,11 @@ export default class Crunchy implements ServiceClass {
 
 		let dlFailed = false;
 		let dlVideoOnce = false; // Variable to save if best selected video quality was downloaded
+
+		// When dlVideoOnce and multiple dubs: use video from first language in dubLang (#799)
+		if (options.dlVideoOnce && medias.data.length > 1 && options.dubLang?.length) {
+			medias.data = Helper.reorderForFirstDubVideo(medias.data, (d) => d.lang?.code, options.dubLang[0]);
+		}
 
 		for (const mMeta of medias.data) {
 			console.info(`Requesting: [${mMeta.mediaId}] ${mediaName}`);
@@ -3513,6 +3518,21 @@ export default class Crunchy implements ServiceClass {
 
 	public async downloadFromSeriesID(id: string, data: CrunchyMultiDownload): Promise<ResponseBase<CrunchyEpMeta[]>> {
 		const { data: episodes } = await this.listSeriesID(id, data);
+		// When series has no seasons (e.g. movie listing id), try movie_listings/{id}/movies
+		if (Object.keys(episodes).length === 0) {
+			const movieItems = await this.listMovieListingID(id, data);
+			if (movieItems.length > 0) {
+				console.info('');
+				console.info('-'.repeat(30));
+				console.info('');
+				for (const item of movieItems) {
+					console.info(
+						`[Movie] - ${item.episodeTitle} [${item.data.map((a) => `✓ ${a.lang?.name || 'Unknown Language'}`).join(', ')}]`
+					);
+				}
+				return { isOk: true, value: movieItems };
+			}
+		}
 		console.info('');
 		console.info('-'.repeat(30));
 		console.info('');
@@ -3528,6 +3548,110 @@ export default class Crunchy implements ServiceClass {
 			);
 		}
 		return { isOk: true, value: Object.values(selected) };
+	}
+
+	/** Build queue items for a movie listing when series/seasons API returns empty (e.g. movie listing id). */
+	public async listMovieListingID(id: string, data: CrunchyMultiDownload): Promise<CrunchyEpMeta[]> {
+		if (!this.cmsToken.cms) return [];
+		const AuthHeaders = {
+			headers: {
+				Authorization: `Bearer ${this.token.access_token}`,
+				...api.crunchyDefHeader
+			}
+		};
+		const listingReq = await this.req.getData(
+			`${api.content_cms}/movie_listings/${id}?force_locale=&preferred_audio_language=ja-JP&locale=${this.locale}`,
+			AuthHeaders
+		);
+		let listingTitle = 'Movie';
+		if (listingReq.ok && listingReq.res) {
+			try {
+				const listing = (await listingReq.res.json()) as { title?: string; data?: { title?: string } };
+				listingTitle = listing?.title ?? listing?.data?.title ?? listingTitle;
+			} catch {
+				// ignore
+			}
+		}
+		const moviesReq = await this.req.getData(
+			`${api.content_cms}/movie_listings/${id}/movies?force_locale=&preferred_audio_language=ja-JP&locale=${this.locale}`,
+			AuthHeaders
+		);
+		if (!moviesReq.ok || !moviesReq.res) return [];
+		const moviesList = (await moviesReq.res.json()) as { total?: number; data?: CrunchyObject[] };
+		const movies = moviesList?.data ?? [];
+		if (movies.length === 0) return [];
+		const doEpsFilter = parseSelect(data.e as string);
+		const result: CrunchyEpMeta[] = [];
+		const defaultLang = data.dubLang?.length ? langsData.languages.find((l) => l.code === data.dubLang[0]) : undefined;
+		for (let i = 0; i < movies.length; i++) {
+			const epNum = (i + 1).toString();
+			if (data.e && !doEpsFilter.isSelected([epNum])) continue;
+			const item = movies[i] as CrunchyObject & { __links__?: { streams?: { href: string } }; streams_link?: string };
+			const playback = item?.__links__?.streams?.href ?? item?.streams_link;
+			if (!playback) continue;
+			const meta = item.movie_listing_metadata ?? item.movie_metadata;
+			const images = (item as CrunchyObject).images?.poster_tall ?? (item as CrunchyObject).images?.poster_wide;
+			const image = Array.isArray(images?.[0]) ? images[0][Math.floor(images[0].length / 2)]?.source : '/notFound.png';
+			result.push({
+				data: [
+					{
+						mediaId: 'M:' + item.id,
+						playback,
+						lang: defaultLang,
+						isSubbed: meta?.is_subbed ?? false,
+						isDubbed: meta?.is_dubbed ?? false,
+						durationMs: meta?.duration_ms ?? 0
+					}
+				],
+				seriesTitle: listingTitle,
+				seasonTitle: listingTitle,
+				episodeNumber: 'Movie',
+				episodeTitle: (item as CrunchyObject).title ?? 'Movie',
+				seasonID: id,
+				season: 0,
+				showID: id,
+				e: epNum,
+				image: typeof image === 'string' ? image : (image as { source?: string })?.source ?? '/notFound.png'
+			});
+		}
+		return result;
+	}
+
+	/** Returns episode list shape for GUI when id is a movie listing (series list empty). */
+	public async listMovieListingEpisodes(id: string): Promise<Episode[]> {
+		if (!this.cmsToken.cms) return [];
+		const AuthHeaders = {
+			headers: {
+				Authorization: `Bearer ${this.token.access_token}`,
+				...api.crunchyDefHeader
+			}
+		};
+		const moviesReq = await this.req.getData(
+			`${api.content_cms}/movie_listings/${id}/movies?force_locale=&preferred_audio_language=ja-JP&locale=${this.locale}`,
+			AuthHeaders
+		);
+		if (!moviesReq.ok || !moviesReq.res) return [];
+		const moviesList = (await moviesReq.res.json()) as { data?: CrunchyObject[] };
+		const movies = moviesList?.data ?? [];
+		return movies.map((item, i) => {
+			const meta = item.movie_listing_metadata ?? item.movie_metadata;
+			const images = item.images?.poster_tall ?? item.images?.poster_wide;
+			const img = Array.isArray(images?.[0]) ? images[0][Math.floor(images[0].length / 2)]?.source : '/notFound.png';
+			const seconds = Math.floor((meta?.duration_ms ?? 0) / 1000);
+			return {
+				e: (i + 1).toString(),
+				lang: ['eng'],
+				name: item.title ?? 'Movie',
+				season: '0',
+				seriesTitle: item.title ?? 'Movie',
+				seasonTitle: item.title ?? 'Movie',
+				episode: 'Movie',
+				id: item.id,
+				img: typeof img === 'string' ? img : (img as { source?: string })?.source ?? '/notFound.png',
+				description: (item as CrunchyObject & { description?: string }).description ?? '',
+				time: `${Math.floor(seconds / 60)}:${seconds % 60}`
+			};
+		});
 	}
 
 	public itemSelectMultiDub(

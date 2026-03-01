@@ -20,19 +20,26 @@ const EpisodeListing: React.FC = () => {
 		return s;
 	}, [store.episodeListing]);
 
+	const multiSeason = seasons.length > 1;
 	const [selected, setSelected] = React.useState<string[]>([]);
 
 	React.useEffect(() => {
-		setSelected(parseSelect(store.downloadOptions.e));
+		const parsed = parseEpisodes(store.downloadOptions.e);
+		if (parsed.length === 0) {
+			setSelected([]);
+			return;
+		}
+		const allEps = store.episodeListing;
+		const matched = allEps.filter((ep) => parsed.includes(ep.e) || parsed.includes(ep.id));
+		setSelected(matched.map((ep) => (multiSeason ? ep.id : ep.e)));
 	}, [store.episodeListing]);
 
 	const close = () => {
-		const mergedEpisodes = [...parseEpisodes(store.downloadOptions.e), ...selected];
 		dispatch({
 			type: 'downloadOptions',
 			payload: {
 				...store.downloadOptions,
-				e: serializeEpisodes(mergedEpisodes)
+				e: serializeEpisodes(selected)
 			}
 		});
 		dispatch({ type: 'episodeListing', payload: [] });
@@ -40,6 +47,22 @@ const EpisodeListing: React.FC = () => {
 
 	const getEpisodesForSeason = (season: string | 'all') => {
 		return store.episodeListing.filter((a) => (season === 'all' ? true : a.season === season));
+	};
+
+	const getSelectKey = (item: (typeof store.episodeListing)[0]) => (multiSeason ? item.id : item.e);
+	const isItemSelected = (item: (typeof store.episodeListing)[0]) => selected.includes(getSelectKey(item));
+	const toggleSelect = (item: (typeof store.episodeListing)[0]) => {
+		const key = getSelectKey(item);
+		setSelected((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
+	};
+	const selectAllForSeason = () => {
+		const eps = getEpisodesForSeason(season);
+		const keys = new Set(eps.map((ep) => getSelectKey(ep)));
+		setSelected((prev) => {
+			const allSelected = eps.every((ep) => prev.includes(getSelectKey(ep)));
+			if (allSelected) return prev.filter((k) => !keys.has(k));
+			return [...prev.filter((k) => !keys.has(k)), ...Array.from(keys)];
+		});
 	};
 
 	return (
@@ -65,21 +88,15 @@ const EpisodeListing: React.FC = () => {
 			<List>
 				<ListItem sx={{ display: 'grid', gridTemplateColumns: '25px 1fr 5fr' }}>
 					<Checkbox
-						indeterminate={store.episodeListing.some((a) => selected.includes(a.e)) && !store.episodeListing.every((a) => selected.includes(a.e))}
-						checked={store.episodeListing.every((a) => selected.includes(a.e))}
-						onChange={() => {
-							if (selected.length > 0) {
-								setSelected([]);
-							} else {
-								setSelected(getEpisodesForSeason(season).map((a) => a.e));
-							}
-						}}
+						indeterminate={getEpisodesForSeason(season).some((a) => isItemSelected(a)) && !getEpisodesForSeason(season).every((a) => isItemSelected(a))}
+						checked={getEpisodesForSeason(season).length > 0 && getEpisodesForSeason(season).every((a) => isItemSelected(a))}
+						onChange={selectAllForSeason}
 					/>
 				</ListItem>
 				{getEpisodesForSeason(season).map((item, index, { length }) => {
 					const e = isNaN(parseInt(item.e)) ? item.e : parseInt(item.e);
-					const idStr = `S${item.season}E${e}`;
-					const isSelected = selected.includes(e.toString());
+					const idStr = multiSeason ? `S${item.season}E${e} (${item.id})` : `S${item.season}E${e}`;
+					const isSelected = isItemSelected(item);
 					const imageRef = React.createRef<HTMLImageElement>();
 					const summaryRef = React.createRef<HTMLParagraphElement>();
 					return (
@@ -91,15 +108,7 @@ const EpisodeListing: React.FC = () => {
 									display: 'grid',
 									gridTemplateColumns: '25px 50px 1fr 5fr'
 								}}
-								onClick={() => {
-									let arr: string[] = [];
-									if (isSelected) {
-										arr = [...selected.filter((a) => a !== e.toString())];
-									} else {
-										arr = [...selected, e.toString()];
-									}
-									setSelected(arr.filter((a) => a.length > 0));
-								}}
+								onClick={() => toggleSelect(item)}
 							>
 								{isSelected ? <CheckBox /> : <CheckBoxOutlineBlank />}
 								<Typography color="text.primary" sx={{ textAlign: 'center' }}>

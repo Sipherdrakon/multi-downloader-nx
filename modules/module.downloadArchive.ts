@@ -3,12 +3,27 @@ import * as fs from 'fs';
 import { ArgvType } from './module.app-args';
 import { workingDir, loadCfg } from './module.cfg-loader';
 
+let archivePathOverride: string | undefined;
+
+/** Set archive file path for this run (e.g. from --archive). Overrides config. */
+export function setArchivePathOverride(p: string) {
+	archivePathOverride = p;
+}
+
+/** Clear the override (e.g. after a run). */
+export function clearArchivePathOverride() {
+	archivePathOverride = undefined;
+}
+
 // Use configured archive path if set, otherwise use default
 // Resolve dynamically to support config changes
 // This allows config changes to take effect without module reload
 const getArchiveFilePath = (): string => {
+	if (archivePathOverride) {
+		return path.isAbsolute(archivePathOverride) ? archivePathOverride : path.join(workingDir, archivePathOverride);
+	}
 	const cfg = loadCfg();
-	if (cfg.dir.archive) {
+	if (cfg.dir?.archive) {
 		// If path is relative, resolve it relative to workingDir
 		return path.isAbsolute(cfg.dir.archive) ? cfg.dir.archive : path.join(workingDir, cfg.dir.archive);
 	}
@@ -208,4 +223,54 @@ const loadData = (): DataType => {
 	return {} as DataType;
 };
 
-export { addToArchive, downloaded, makeCommand };
+type ArchiveKind =
+	| { service: 'crunchy'; type: 's' | 'srz' }
+	| { service: 'hidive'; type: 's' }
+	| { service: 'adn'; type: 's' }
+	| { service: 'oceanveil'; type: 'srz' };
+
+/** Remove a series/season from the archive so it is no longer included in --downloadArchive. */
+function removeFromArchive(kind: ArchiveKind, ID: string): boolean {
+	const data = loadData();
+	const svc = (data as any)[kind.service];
+	if (!svc || !svc[kind.type]) return false;
+	const items = (svc[kind.type] as ItemType).filter((a: { id: string }) => a.id !== ID);
+	if (items.length === (svc[kind.type] as ItemType).length) return false;
+	(data as any)[kind.service][kind.type] = items;
+	const archivePath = getArchiveFilePath();
+	const archiveDir = path.dirname(archivePath);
+	if (!fs.existsSync(archiveDir)) fs.mkdirSync(archiveDir, { recursive: true });
+	fs.writeFileSync(archivePath, JSON.stringify(data, null, 4));
+	return true;
+}
+
+/** Add episode numbers/ids to the already-seen list for a series (mark as watched without downloading). */
+function addEpisodesToArchive(kind: ArchiveKind, ID: string, episodeList: string[]): boolean {
+	let data = loadData();
+	const svc = (data as any)[kind.service];
+	const typ = kind.type;
+	if (!svc || !svc[typ]) {
+		addToArchive(kind, ID);
+		data = loadData();
+	}
+	const items = ((data as any)[kind.service][typ] ?? []) as { id: string; already: string[] }[];
+	const entry = items.find((a) => a.id === ID);
+	if (!entry) return false;
+	for (const ep of episodeList) {
+		if (entry.already.includes(ep)) continue;
+		entry.already.push(ep);
+	}
+	entry.already.sort((a, b) => {
+		const na = parseInt(a, 10);
+		const nb = parseInt(b, 10);
+		if (!isNaN(na) && !isNaN(nb)) return na - nb;
+		return String(a).localeCompare(String(b));
+	});
+	const archivePath = getArchiveFilePath();
+	const archiveDir = path.dirname(archivePath);
+	if (!fs.existsSync(archiveDir)) fs.mkdirSync(archiveDir, { recursive: true });
+	fs.writeFileSync(archivePath, JSON.stringify(data, null, 4));
+	return true;
+}
+
+export { addToArchive, downloaded, makeCommand, setArchivePathOverride, clearArchivePathOverride, removeFromArchive, addEpisodesToArchive };

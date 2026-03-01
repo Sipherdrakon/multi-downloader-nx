@@ -572,6 +572,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			return undefined;
 		}
 		const streams = (await streamsRequest.res.json()) as ADNStreams;
+		let streamEntries: { streamName: string; audDub: langsData.LanguageItem }[] = [];
 		for (const streamName in streams.links.streaming) {
 			let audDub: langsData.LanguageItem;
 			if (this.jpnStrings.includes(streamName)) {
@@ -584,11 +585,13 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 				console.error(`Language ${streamName} not recognized, please report this.`);
 				continue;
 			}
-
-			if (!options.dubLang.includes(audDub.code)) {
-				continue;
-			}
-
+			if (!options.dubLang.includes(audDub.code)) continue;
+			streamEntries.push({ streamName, audDub });
+		}
+		if (options.dlVideoOnce && streamEntries.length > 1 && options.dubLang?.length) {
+			streamEntries = Helper.reorderForFirstDubVideo(streamEntries, (e) => e.audDub?.code, options.dubLang[0]);
+		}
+		for (const { streamName, audDub } of streamEntries) {
 			console.info(`Requesting: [${data.id}] ${mediaName} (${audDub.name})`);
 
 			variables.push(

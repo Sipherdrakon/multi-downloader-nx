@@ -26,7 +26,12 @@ class CrunchyHandler extends Base implements MessageHandler {
 	public async listEpisodes(id: string): Promise<EpisodeListResponse> {
 		this.getDefaults();
 		await this.crunchy.refreshToken(true);
-		return { isOk: true, value: (await this.crunchy.listSeriesID(id)).list };
+		const { list } = await this.crunchy.listSeriesID(id);
+		if (list.length === 0) {
+			const movieList = await this.crunchy.listMovieListingEpisodes(id);
+			return { isOk: true, value: movieList };
+		}
+		return { isOk: true, value: list };
 	}
 
 	public async handleDefault(name: string) {

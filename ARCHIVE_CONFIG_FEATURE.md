@@ -143,10 +143,34 @@ anidl.exe --downloadArchive -s GRMG8ZQZR
 4. **Invalid paths** - Verify graceful handling of invalid paths
 5. **Cross-platform** - Test on Windows, Linux, and macOS
 
+### CLI Override and Archive Commands
+
+**`--archive <path>`** – Use a specific archive file for this run (overrides config). Enables different archives without changing config or using multiple copies:
+
+```bash
+# Seasonal archive
+aniDL --archive ./config/seasonal-archive.json --downloadArchive --service crunchy
+
+# One Piece only
+aniDL --archive ./config/onepiece-archive.json --downloadArchive --service crunchy --srz GRMG8ZQZR
+```
+
+**`--removeArchive`** – Remove a series/season from the archive (use with `--service` and `-s` or `--srz`):
+
+```bash
+aniDL --service crunchy --srz GXXX --removeArchive
+```
+
+**`--archiveAddEpisodes <list>`** – Mark episodes as already in archive without downloading (e.g. `"1,2,3"` or `"1-5"`). Use with `--service` and `-s` or `--srz`. Add the series first with `--addArchive` if needed:
+
+```bash
+aniDL --service crunchy --srz GXXX --addArchive   # once
+aniDL --service crunchy --srz GXXX --archiveAddEpisodes "1-12"
+```
+
 ## Future Enhancements
 
 Potential improvements for future PRs:
-- Add command-line option `--archive-file` to override configuration
 - Add archive file validation and error messages
 - Support environment variable expansion in path
 - Add archive migration/import tool

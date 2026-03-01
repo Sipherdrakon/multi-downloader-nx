@@ -104,6 +104,18 @@ export default class Helper {
 		return Math.max(maxAudioSuffixLength, maxSubtitleSuffixLength) + 10;
 	}
 
+	/**
+	 * When dlVideoOnce is used with multiple dubs, reorder items so the track matching
+	 * the first requested language is first. Service-agnostic: pass any array and a getter for lang code.
+	 */
+	static reorderForFirstDubVideo<T>(items: T[], getLangCode: (item: T) => string | undefined, firstDubCode: string): T[] {
+		if (items.length <= 1 || !firstDubCode) return items;
+		const idx = items.findIndex((item) => getLangCode(item) === firstDubCode);
+		if (idx <= 0) return items;
+		const out = [items[idx], ...items.slice(0, idx), ...items.slice(idx + 1)];
+		return out;
+	}
+
 	static exec(
 		pname: string,
 		fpath: string,
