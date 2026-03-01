@@ -3008,6 +3008,7 @@ export default class Crunchy implements ServiceClass {
 					const subsArr = langsData.sortSubtitles<(typeof subsDataMapped)[0]>(subsDataMapped, 'language');
 					for (const subsIndex in subsArr) {
 						const subsItem = subsArr[subsIndex];
+						if (options.noCC && subsItem.isCC) continue;
 						const langItem = subsItem.locale;
 						const sxData: Partial<sxItem> = {};
 						sxData.language = langItem;
@@ -3350,7 +3351,8 @@ export default class Crunchy implements ServiceClass {
 				audio: options.defaultAudio,
 				sub: options.defaultSub
 			},
-			ccTag: options.ccTag
+			ccTag: options.ccTag,
+			subTrackOrder: options.subTrackOrder
 		});
 		const bin = Merger.checkMerger(this.cfg.bin, options.mp4, options.forceMuxer);
 		// collect fonts info

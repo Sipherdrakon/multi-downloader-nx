@@ -600,6 +600,18 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: ''
 	},
 	{
+		name: 'noCC',
+		group: 'dl',
+		describe: 'Do not download closed caption subtitle tracks (only regular subtitles).',
+		docDescribe: true,
+		service: ['all'],
+		type: 'boolean',
+		usage: '',
+		default: {
+			default: false
+		}
+	},
+	{
 		name: 'dubLang',
 		describe:
 			'Set the language to download: ' +
@@ -1143,6 +1155,18 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		usage: '${tag}',
 		default: {
 			default: 'cc'
+		}
+	},
+	{
+		name: 'subTrackOrder',
+		describe: 'Order of subtitle track types in the muxed file (comma-separated: signs, full, cc). E.g. signs,full,cc puts signs first.',
+		docDescribe: true,
+		group: 'mux',
+		service: ['all'],
+		type: 'string',
+		usage: '${signs,full,cc}',
+		default: {
+			default: 'full,signs,cc'
 		}
 	},
 	{

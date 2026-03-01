@@ -11,6 +11,7 @@ import pj from '../package.json';
 export let argvC: {
 	[x: string]: unknown;
 	ccTag: string;
+	subTrackOrder?: string;
 	defaultAudio: LanguageItem;
 	defaultSub: LanguageItem;
 	ffmpegOptions: string[];
@@ -68,6 +69,7 @@ export let argvC: {
 	novids: boolean | undefined;
 	noaudio: boolean | undefined;
 	nosubs: boolean | undefined;
+	noCC: boolean | undefined;
 	dubLang: string[];
 	all: boolean;
 	fontSize: number;

@@ -1225,7 +1225,8 @@ export default class Hidive implements ServiceClass {
 				audio: options.defaultAudio,
 				sub: options.defaultSub
 			},
-			ccTag: options.ccTag
+			ccTag: options.ccTag,
+			subTrackOrder: options.subTrackOrder
 		});
 		const bin = Merger.checkMerger(this.cfg.bin, options.mp4, options.forceMuxer);
 		// collect fonts info

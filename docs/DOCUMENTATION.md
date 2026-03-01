@@ -365,6 +365,12 @@ Skip downloading audio
 | All | `--nosubs ` | `boolean` | `No`| `NaN` | `NaN` |
 
 Skip downloading subtitles
+#### `--noCC`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--noCC ` | `boolean` | `No`| `NaN` | `false`| `noCC: ` |
+
+Do not download closed caption subtitle tracks (only regular subtitles).
 #### `--dubLang`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** | **Choices** | **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | --- | ---| 
@@ -547,6 +553,12 @@ Possible Values: und, eng, eng, spa, spa-419, spa-ES, por, por, fra, deu, ara-ME
 
 Set the default subtitle track by language code
 Possible Values: und, eng, eng, spa, spa-419, spa-ES, por, por, fra, deu, ara-ME, ara, ita, rus, tur, hin, cmn, zho, chi, zh-HK, kor, cat, pol, tha, tam, may, vie, ind, tel, jpn
+#### `--subTrackOrder`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
+| --- | --- | --- | --- | --- | --- | ---| 
+| All | `--subTrackOrder ${signs,full,cc}` | `string` | `No`| `NaN` | `full,signs,cc`| `subTrackOrder: ` |
+
+Order of subtitle track types in the muxed file (comma-separated: signs, full, cc). E.g. signs,full,cc puts signs first.
 ### Filename Template
 #### `--fileName`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
