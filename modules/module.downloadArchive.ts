@@ -273,4 +273,4 @@ function addEpisodesToArchive(kind: ArchiveKind, ID: string, episodeList: string
 	return true;
 }
 
-export { addToArchive, downloaded, makeCommand, setArchivePathOverride, clearArchivePathOverride, removeFromArchive, addEpisodesToArchive };
+export { addToArchive, downloaded, makeCommand, removeFromArchive, addEpisodesToArchive };

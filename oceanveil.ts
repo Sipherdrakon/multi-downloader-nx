@@ -330,15 +330,16 @@ export default class Oceanveil implements ServiceClass {
 		return { ok: true, data, body: bodyText, res: res.res };
 	}
 
-	/** List episodes for a title (for GUI: same shape as other services' listEpisodes) */
+	/** List episodes for a title (for GUI: same shape as other services' listEpisodes). OV: jpn unless title has "Dub" then eng. */
 	public async listEpisodes(titleId: string): Promise<{ isOk: true; value: Episode[] } | { isOk: false; reason: Error }> {
 		const meta = await this.getTitleMetadata(titleId);
 		if (!meta) return { isOk: false, reason: new Error('Title not found') };
+		const lang = meta.showTitle && /Dub/i.test(meta.showTitle) ? ['eng'] : ['jpn'];
 		return {
 			isOk: true,
 			value: meta.episodes.map((ep): Episode => ({
 				e: String(ep.displayNumber ?? ep.id),
-				lang: [] as string[],
+				lang,
 				name: ep.name,
 				season: '1',
 				seasonTitle: meta.showTitle,

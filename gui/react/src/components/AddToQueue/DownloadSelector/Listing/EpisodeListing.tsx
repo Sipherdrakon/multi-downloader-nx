@@ -20,7 +20,12 @@ const EpisodeListing: React.FC = () => {
 		return s;
 	}, [store.episodeListing]);
 
-	const multiSeason = seasons.length > 1;
+	// Use episode ID for selection when same episode number appears in different seasons (e.g. S1E6 vs S2E6)
+	const useIdForSelection = React.useMemo(() => {
+		const epNumbers = store.episodeListing.map((ep) => ep.e);
+		return epNumbers.length > 0 && epNumbers.length !== new Set(epNumbers).size;
+	}, [store.episodeListing]);
+	const multiSeason = seasons.length > 1 || useIdForSelection;
 	const [selected, setSelected] = React.useState<string[]>([]);
 
 	React.useEffect(() => {
@@ -30,9 +35,16 @@ const EpisodeListing: React.FC = () => {
 			return;
 		}
 		const allEps = store.episodeListing;
-		const matched = allEps.filter((ep) => parsed.includes(ep.e) || parsed.includes(ep.id));
+		const matched = allEps.filter((ep) => {
+			if (parsed.includes(ep.e) || parsed.includes(ep.id)) return true;
+			if (multiSeason && parsed.some((t) => {
+				const m = t.match(/^S(\d+)E(\d+)$/i);
+				return m && String(ep.season) === String(Number(m[1])) && String(ep.e) === String(Number(m[2]));
+			})) return true;
+			return false;
+		});
 		setSelected(matched.map((ep) => (multiSeason ? ep.id : ep.e)));
-	}, [store.episodeListing]);
+	}, [store.episodeListing, store.downloadOptions.e, multiSeason]);
 
 	const close = () => {
 		dispatch({
