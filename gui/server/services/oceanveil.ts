@@ -43,6 +43,7 @@ class OceanveilHandler extends Base implements MessageHandler {
 		return getDefault(name, this.oceanveil.cfg.cli);
 	}
 
+	/** OV only supports two audio options: Japanese (original) and one other (do not label as "Dub"). */
 	public async availableDubCodes(): Promise<string[]> {
 		return ['jpn', 'eng'];
 	}
