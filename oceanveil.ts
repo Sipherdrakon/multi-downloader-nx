@@ -503,10 +503,11 @@ export default class Oceanveil implements ServiceClass {
 			console.error('[OceanVeil] Not logged in. Use --auth first.');
 			return;
 		}
-		const limit = 20;
+		const limit = 50;
+		const daysAgo = 360;
 		const r = await this.apiRequest(
 			'GET',
-			`/anime_episodes/new_episodes?limit=${limit}&include[]=anime_title&include[]=anime_title.genre&is_mature=${isMature}`
+			`/anime_episodes/new_episodes?limit=${limit}&days_ago=${daysAgo}&is_mature=${isMature}&include[]=anime_title&include[]=anime_title.genre`
 		);
 		if (!r.ok || !r.data) {
 			console.error('[OceanVeil] Failed to fetch new episodes.');
