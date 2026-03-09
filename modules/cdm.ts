@@ -8,18 +8,31 @@ import Widevine, { KeyContainer, LicenseType } from 'widevine';
 
 const req = new reqModule.Req();
 
+// CDM base: use contentDirectory when set and valid (e.g. Homebrew), else workingDir; fallback avoids bad path
+const cdmBase =
+	process.env.contentDirectory &&
+	(() => {
+		try {
+			return fs.existsSync(process.env.contentDirectory!) && fs.statSync(process.env.contentDirectory!).isDirectory();
+		} catch {
+			return false;
+		}
+	})()
+		? process.env.contentDirectory!
+		: workingDir;
+
 //read cdm files located in the same directory
 let widevine: Widevine | undefined, playready: Playready | undefined;
 export let cdm: 'widevine' | 'playready';
 export let canDecrypt: boolean;
 try {
-	const files_prd = fs.readdirSync(path.join(workingDir, 'playready'));
+	const files_prd = fs.readdirSync(path.join(cdmBase, 'playready'));
 	const bgroup_file_found = files_prd.find((f) => f.includes('bgroupcert'));
 	const zgpriv_file_found = files_prd.find((f) => f.includes('zgpriv'));
 	const prd_file_found = files_prd.find((f) => f.endsWith('.prd'));
 	try {
-		const file_bgroup = path.join(workingDir, 'playready', 'bgroupcert.dat');
-		const file_zgpriv = path.join(workingDir, 'playready', 'zgpriv.dat');
+		const file_bgroup = path.join(cdmBase, 'playready', 'bgroupcert.dat');
+		const file_zgpriv = path.join(cdmBase, 'playready', 'zgpriv.dat');
 
 		if (bgroup_file_found && zgpriv_file_found) {
 			const bgroup_stats = fs.statSync(file_bgroup);
@@ -34,7 +47,7 @@ try {
 				playready = Playready.init(bgroup, zgpriv);
 			}
 		} else if (prd_file_found) {
-			const file_prd = path.join(workingDir, 'playready', prd_file_found);
+			const file_prd = path.join(cdmBase, 'playready', prd_file_found);
 			const prd = fs.readFileSync(file_prd);
 
 			// Init Playready Client with PRD file
@@ -45,7 +58,7 @@ try {
 		console.error(e);
 	}
 
-	const files_wvd = fs.readdirSync(path.join(workingDir, 'widevine'));
+	const files_wvd = fs.readdirSync(path.join(cdmBase, 'widevine'));
 	try {
 		let identifierBlob: Buffer = Buffer.from([]);
 		let privateKey: Buffer = Buffer.from([]);
@@ -53,7 +66,7 @@ try {
 
 		// Searching files for client id blob and private key
 		files_wvd.forEach(function (file) {
-			file = path.join(workingDir, 'widevine', file);
+			file = path.join(cdmBase, 'widevine', file);
 			const stats = fs.statSync(file);
 			if (stats.size < 1024 * 8 && stats.isFile()) {
 				const fileContents = fs.readFileSync(file, { encoding: 'utf8' });
