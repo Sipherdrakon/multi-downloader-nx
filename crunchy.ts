@@ -1234,8 +1234,8 @@ export default class Crunchy implements ServiceClass {
 				epNumList.ep.push(parseInt(epNum, 10));
 			}
 			const selEpId = isSpecial ? 'S' + epNumList.sp.toString().padStart(epNumLen, '0') : '' + parseInt(epNum, 10).toString().padStart(epNumLen, '0');
-			// set data: use relative (episode_number or selEpId) unless --absolute
-			const epNumForMeta = absolute ? item.episode : (typeof (item as { episode_number?: number }).episode_number === 'number' ? String((item as { episode_number: number }).episode_number) : selEpId);
+			// set data: --absolute → use episode_number (absolute); else → episode or selEpId (relative). Matches itemSelectMultiDub.
+			const epNumForMeta = absolute ? (typeof (item as { episode_number?: number }).episode_number === 'number' ? String((item as { episode_number: number }).episode_number) : item.episode) : (item.episode ?? selEpId);
 			const images = (item.images?.thumbnail ?? [[{ source: '/notFound.png' }]])[0];
 			const epMeta: CrunchyEpMeta = {
 				data: [
@@ -1496,7 +1496,7 @@ export default class Crunchy implements ServiceClass {
 				];
 				epMeta.seriesTitle = item.episode_metadata.series_title;
 				epMeta.seasonTitle = item.episode_metadata.season_title;
-				epMeta.episodeNumber = absolute ? item.episode_metadata.episode : (item.episode_metadata.episode_number != null && item.episode_metadata.episode_number !== undefined ? String(item.episode_metadata.episode_number) : item.episode_metadata.episode);
+				epMeta.episodeNumber = absolute ? (item.episode_metadata.episode_number != null && item.episode_metadata.episode_number !== undefined ? String(item.episode_metadata.episode_number) : item.episode_metadata.episode) : item.episode_metadata.episode;
 				epMeta.episodeTitle = item.title;
 				epMeta.season = item.episode_metadata.season_number;
 			} else if (item.movie_listing_metadata) {
