@@ -172,7 +172,7 @@ export default class Crunchy implements ServiceClass {
 				console.info('One show can only be downloaded with one dub. Use --srz instead.');
 			}
 			argv.dubLang = [argv.dubLang[0]];
-			const selected = await this.getSeasonById(argv.s, argv.numbers, argv.e, argv.but, argv.all);
+			const selected = await this.getSeasonById(argv.s, argv.numbers, argv.e, argv.but, argv.all, argv.absolute as boolean | undefined);
 			if (selected.isOk) {
 				for (const select of selected.value) {
 					if (!(await this.downloadEpisode(select, { ...argv, skipsubs: false }))) {
@@ -188,7 +188,7 @@ export default class Crunchy implements ServiceClass {
 				console.info('One show can only be downloaded with one dub. Use --srz instead.');
 			}
 			argv.dubLang = [argv.dubLang[0]];
-			const selected = await this.getObjectById(argv.e, false);
+			const selected = await this.getObjectById(argv.e, false, false, argv.absolute as boolean | undefined);
 			for (const select of selected as Partial<CrunchyEpMeta>[]) {
 				if (!(await this.downloadEpisode(select as CrunchyEpMeta, { ...argv, skipsubs: false }))) {
 					console.error(`Unable to download selected episode ${select.episodeNumber}`);
@@ -202,7 +202,7 @@ export default class Crunchy implements ServiceClass {
 				console.info('One show can only be downloaded with one dub. Use --srz instead.');
 			}
 			argv.dubLang = [argv.dubLang[0]];
-			const selected = await this.getObjectById(argv.extid, false, true);
+			const selected = await this.getObjectById(argv.extid, false, true, argv.absolute as boolean | undefined);
 			for (const select of selected as Partial<CrunchyEpMeta>[]) {
 				if (!(await this.downloadEpisode(select as CrunchyEpMeta, { ...argv, skipsubs: false }))) {
 					console.error(`Unable to download selected episode ${select.episodeNumber}`);
@@ -1118,7 +1118,7 @@ export default class Crunchy implements ServiceClass {
 		console.info(`  Total results: ${newlyAddedResults.total} (Page: ${pageCur}/${pageMax})`);
 	}
 
-	public async getSeasonById(id: string, numbers: number, e: string | undefined, but: boolean, all: boolean): Promise<ResponseBase<CrunchyEpMeta[]>> {
+	public async getSeasonById(id: string, numbers: number, e: string | undefined, but: boolean, all: boolean, absolute?: boolean): Promise<ResponseBase<CrunchyEpMeta[]>> {
 		if (!this.cmsToken.cms) {
 			console.error('Authentication required!');
 			return { isOk: false, reason: new Error('Authentication required') };
@@ -1234,7 +1234,8 @@ export default class Crunchy implements ServiceClass {
 				epNumList.ep.push(parseInt(epNum, 10));
 			}
 			const selEpId = isSpecial ? 'S' + epNumList.sp.toString().padStart(epNumLen, '0') : '' + parseInt(epNum, 10).toString().padStart(epNumLen, '0');
-			// set data
+			// set data: use relative (episode_number or selEpId) unless --absolute
+			const epNumForMeta = absolute ? item.episode : (typeof (item as { episode_number?: number }).episode_number === 'number' ? String((item as { episode_number: number }).episode_number) : selEpId);
 			const images = (item.images?.thumbnail ?? [[{ source: '/notFound.png' }]])[0];
 			const epMeta: CrunchyEpMeta = {
 				data: [
@@ -1249,7 +1250,7 @@ export default class Crunchy implements ServiceClass {
 				],
 				seriesTitle: item.series_title,
 				seasonTitle: item.season_title,
-				episodeNumber: item.episode,
+				episodeNumber: epNumForMeta,
 				episodeTitle: item.title,
 				seasonID: item.season_id,
 				season: item.season_number,
@@ -1329,7 +1330,7 @@ export default class Crunchy implements ServiceClass {
 		return true;
 	}
 
-	public async getObjectById(e?: string, earlyReturn?: boolean, external_id?: boolean): Promise<ObjectInfo | Partial<CrunchyEpMeta>[] | undefined> {
+	public async getObjectById(e?: string, earlyReturn?: boolean, external_id?: boolean, absolute?: boolean): Promise<ObjectInfo | Partial<CrunchyEpMeta>[] | undefined> {
 		if (!this.cmsToken.cms) {
 			console.error('Authentication required!');
 			return [];
@@ -1495,7 +1496,7 @@ export default class Crunchy implements ServiceClass {
 				];
 				epMeta.seriesTitle = item.episode_metadata.series_title;
 				epMeta.seasonTitle = item.episode_metadata.season_title;
-				epMeta.episodeNumber = item.episode_metadata.episode;
+				epMeta.episodeNumber = absolute ? item.episode_metadata.episode : (item.episode_metadata.episode_number != null && item.episode_metadata.episode_number !== undefined ? String(item.episode_metadata.episode_number) : item.episode_metadata.episode);
 				epMeta.episodeTitle = item.title;
 				epMeta.season = item.episode_metadata.season_number;
 			} else if (item.movie_listing_metadata) {
@@ -3717,7 +3718,7 @@ export default class Crunchy implements ServiceClass {
 					],
 					seriesTitle: itemE.items.find((a) => !a.series_title.match(/\(\w+ Dub\)/))?.series_title ?? itemE.items[0].series_title.replace(/\(\w+ Dub\)/g, '').trimEnd(),
 					seasonTitle: itemE.items.find((a) => !a.season_title.match(/\(\w+ Dub\)/))?.season_title ?? itemE.items[0].season_title.replace(/\(\w+ Dub\)/g, '').trimEnd(),
-					episodeNumber: item.episode,
+					episodeNumber: epNum,
 					episodeTitle: item.title,
 					seasonID: item.season_id,
 					season: item.season_number,
