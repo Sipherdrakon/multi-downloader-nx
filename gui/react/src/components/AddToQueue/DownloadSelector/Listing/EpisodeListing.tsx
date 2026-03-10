@@ -20,12 +20,13 @@ const EpisodeListing: React.FC = () => {
 		return s;
 	}, [store.episodeListing]);
 
-	// Use episode ID for selection when same episode number appears in different seasons (e.g. S1E6 vs S2E6)
+	// Use episode ID for selection only on Hidive when same episode number appears in different seasons (e.g. S1E6 vs S2E6)
 	const useIdForSelection = React.useMemo(() => {
 		const epNumbers = store.episodeListing.map((ep) => ep.e);
 		return epNumbers.length > 0 && epNumbers.length !== new Set(epNumbers).size;
 	}, [store.episodeListing]);
 	const multiSeason = seasons.length > 1 || useIdForSelection;
+	const useIdForKey = multiSeason && store.service === 'hidive';
 	const [selected, setSelected] = React.useState<string[]>([]);
 
 	React.useEffect(() => {
@@ -37,14 +38,18 @@ const EpisodeListing: React.FC = () => {
 		const allEps = store.episodeListing;
 		const matched = allEps.filter((ep) => {
 			if (parsed.includes(ep.e) || parsed.includes(ep.id)) return true;
-			if (multiSeason && parsed.some((t) => {
-				const m = t.match(/^S(\d+)E(\d+)$/i);
-				return m && String(ep.season) === String(Number(m[1])) && String(ep.e) === String(Number(m[2]));
-			})) return true;
+			if (
+				multiSeason &&
+				parsed.some((t) => {
+					const m = t.match(/^S(\d+)E(\d+)$/i);
+					return m && String(ep.season) === String(Number(m[1])) && String(ep.e) === String(Number(m[2]));
+				})
+			)
+				return true;
 			return false;
 		});
-		setSelected(matched.map((ep) => (multiSeason ? ep.id : ep.e)));
-	}, [store.episodeListing, store.downloadOptions.e, multiSeason]);
+		setSelected(matched.map((ep) => (useIdForKey ? ep.id : ep.e)));
+	}, [store.episodeListing, store.downloadOptions.e, multiSeason, useIdForKey]);
 
 	const close = () => {
 		dispatch({
@@ -61,7 +66,7 @@ const EpisodeListing: React.FC = () => {
 		return store.episodeListing.filter((a) => (season === 'all' ? true : a.season === season));
 	};
 
-	const getSelectKey = (item: (typeof store.episodeListing)[0]) => (multiSeason ? item.id : item.e);
+	const getSelectKey = (item: (typeof store.episodeListing)[0]) => (useIdForKey ? item.id : item.e);
 	const isItemSelected = (item: (typeof store.episodeListing)[0]) => selected.includes(getSelectKey(item));
 	const toggleSelect = (item: (typeof store.episodeListing)[0]) => {
 		const key = getSelectKey(item);
@@ -107,7 +112,7 @@ const EpisodeListing: React.FC = () => {
 				</ListItem>
 				{getEpisodesForSeason(season).map((item, index, { length }) => {
 					const e = isNaN(parseInt(item.e)) ? item.e : parseInt(item.e);
-					const idStr = multiSeason ? `S${item.season}E${e} (${item.id})` : `S${item.season}E${e}`;
+					const idStr = useIdForKey ? `S${item.season}E${e} (${item.id})` : `S${item.season}E${e}`;
 					const isSelected = isItemSelected(item);
 					const imageRef = React.createRef<HTMLImageElement>();
 					const summaryRef = React.createRef<HTMLParagraphElement>();
