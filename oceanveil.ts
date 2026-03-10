@@ -389,11 +389,31 @@ export default class Oceanveil implements ServiceClass {
 	/** Resolve a numeric OceanVeil episode ID to its parent title ID. */
 	public async getEpisodeTitleId(episodeId: string, isMature = true): Promise<string | null> {
 		if (!/^\d+$/.test(episodeId)) return null;
-		const r = await this.apiRequest('GET', `/anime_episodes/${episodeId}?is_mature=${isMature}&include[]=anime_title`);
-		if (!r.ok || !r.data) return null;
-		const json = r.data as OceanVeilEpisodeResponse;
-		const titleId = json.data?.relationships?.animeTitle?.data?.id;
-		return typeof titleId === 'string' && /^\d+$/.test(titleId) ? titleId : null;
+		// Try direct episode metadata first (not always available on OV).
+		{
+			const r = await this.apiRequest('GET', `/anime_episodes/${episodeId}?include[]=anime_title`);
+			if (r.ok && r.data) {
+				const json = r.data as OceanVeilEpisodeResponse;
+				const titleId = json.data?.relationships?.animeTitle?.data?.id;
+				if (typeof titleId === 'string' && /^\d+$/.test(titleId)) return titleId;
+			}
+		}
+
+		// Fallback: resolve via new_episodes feed which includes title relations.
+		// This covers the common case where the user copies an episode id from `--new`.
+		{
+			const limit = 50;
+			const daysAgo = 360;
+			const r = await this.apiRequest(
+				'GET',
+				`/anime_episodes/new_episodes?limit=${limit}&days_ago=${daysAgo}&is_mature=${isMature}&include[]=anime_title`
+			);
+			if (!r.ok || !r.data) return null;
+			const json = r.data as OceanVeilNewEpisodesResponse;
+			const ep = (json.data || []).find((e) => e.id === episodeId);
+			const titleId = ep?.relationships?.animeTitle?.data?.id;
+			return typeof titleId === 'string' && /^\d+$/.test(titleId) ? titleId : null;
+		}
 	}
 
 	/**
@@ -978,6 +998,10 @@ export default class Oceanveil implements ServiceClass {
 
 		// -e only without series+season context
 		if (argv.e && !seriesId) {
+			if (!this.checkToken()) {
+				console.error('[OceanVeil] Not logged in. Use --auth first.');
+				return;
+			}
 			// Convenience: allow downloading by global episode ID without --srz.
 			// This only supports numeric episode IDs (the IDs shown in --new output).
 			const epIds = String(argv.e)
