@@ -309,7 +309,7 @@ export default class Oceanveil implements ServiceClass {
 			yamlCfg.saveOceanveilToken(this.token);
 			const creds = this.getReauthCredentials();
 			if (!creds) {
-				console.error('[OceanVeil] Re-auth failed: no stored credentials. Use Authenticate in GUI.');
+				console.error('[OceanVeil] Re-auth failed: no stored credentials. Run with --auth or set username/password in cli-defaults.yml.');
 				return { ok: false };
 			}
 			const relogin = await this.doAuth(creds);
@@ -731,12 +731,15 @@ export default class Oceanveil implements ServiceClass {
 		const videoHeight = meta.height ?? 720;
 		const videoWidth = meta.width ?? 1280;
 		const episodeNo = options.episodeNumber ?? episodeTitle;
+		const episodeNoNum = typeof episodeNo === 'number' ? episodeNo : /^\d+$/.test(String(episodeNo)) ? Number(episodeNo) : NaN;
 		const variables: Variable[] = [
 			{ name: 'service', type: 'string', replaceWith: 'OV' },
 			{ name: 'showTitle', type: 'string', replaceWith: showTitle },
 			{ name: 'seriesTitle', type: 'string', replaceWith: showTitle },
 			{ name: 'title', type: 'string', replaceWith: episodeTitle },
-			{ name: 'episode', type: 'string', replaceWith: String(episodeNo) },
+			Number.isFinite(episodeNoNum)
+				? ({ name: 'episode', type: 'number', replaceWith: episodeNoNum } as Variable)
+				: ({ name: 'episode', type: 'string', replaceWith: String(episodeNo) } as Variable),
 			{ name: 'season', type: 'number', replaceWith: 1 },
 			{ name: 'height', type: 'number', replaceWith: videoHeight },
 			{ name: 'width', type: 'number', replaceWith: videoWidth }
@@ -1013,23 +1016,80 @@ export default class Oceanveil implements ServiceClass {
 				return;
 			}
 
+			// Heavy but seldom-used path: fetch all mature episodes once so we can
+			// populate episodeNumber and episodeTitle (like other services) for -e only.
+			const episodeMetaById = new Map<
+				string,
+				{
+					displayNumber?: string | number | null;
+					name?: string;
+					titleName?: string;
+				}
+			>();
+			try {
+				const allEpResp = await this.apiRequest('GET', `/anime_titles/?include[]=anime_episodes&is_mature=${isMature}`);
+				if (allEpResp.ok && allEpResp.data && typeof allEpResp.data === 'object') {
+					const json = allEpResp.data as {
+						data?: {
+							id?: string;
+							type?: string;
+							attributes?: { name?: string };
+							relationships?: {
+								animeEpisodes?: {
+									data?: { id?: string; type?: string }[];
+								};
+							};
+						}[];
+						included?: {
+							id?: string;
+							type?: string;
+							attributes?: { displayNumber?: string | number | null; name?: string };
+						}[];
+					};
+					// First, collect per-episode basic metadata (number + name)
+					for (const inc of json.included || []) {
+						if (inc.type === 'animeEpisode' && inc.id) {
+							episodeMetaById.set(inc.id, {
+								displayNumber: inc.attributes?.displayNumber ?? null,
+								name: inc.attributes?.name
+							});
+						}
+					}
+					// Then, attach title names to episodes via animeTitle.relationships.animeEpisodes
+					for (const t of json.data || []) {
+						if (t.type !== 'animeTitle' || !t.id) continue;
+						const titleName = t.attributes?.name;
+						const eps = t.relationships?.animeEpisodes?.data || [];
+						for (const ref of eps) {
+							if (!ref.id || ref.type !== 'animeEpisode') continue;
+							const existing = episodeMetaById.get(ref.id) ?? {};
+							episodeMetaById.set(ref.id, {
+								...existing,
+								titleName
+							});
+						}
+					}
+				}
+			} catch {
+				// If this fails completely, do not silently fall back; behave like other services and error out below.
+			}
+
+			if (episodeMetaById.size === 0) {
+				console.error('[OceanVeil] Failed to resolve episode metadata for -e; try again later or use --srz <title_id>.');
+				return;
+			}
+
 			for (const epId of epIds) {
-				const titleId = await this.getEpisodeTitleId(epId, isMature);
-				if (!titleId) {
-					console.error('[OceanVeil] Episode not found or missing title relation:', epId);
+				const meta = episodeMetaById.get(epId);
+				if (!meta || !meta.titleName) {
+					console.error(`[OceanVeil] Episode ${epId} not found in catalog; cannot resolve metadata.`);
 					return;
 				}
-				const meta = await this.getTitleMetadata(titleId, isMature);
-				if (!meta) {
-					console.error('[OceanVeil] Title not found:', titleId);
-					return;
-				}
-				const ep = meta.episodes.find((e) => e.id === epId);
-				if (!ep) {
-					console.error('[OceanVeil] Episode not found in title episode list:', epId);
-					return;
-				}
-				const ok = await this.downloadEpisode(ep.id, meta.showTitle, ep.name, {
+				const showTitle = meta.titleName;
+				const episodeNumber = meta.displayNumber ?? epId;
+				const episodeTitle = meta.name ?? `Episode ${episodeNumber}`;
+
+				const ok = await this.downloadEpisode(epId, showTitle, episodeTitle, {
 					timeout: argv.timeout,
 					fileName: argv.fileName,
 					numbers: argv.numbers,
@@ -1043,13 +1103,12 @@ export default class Oceanveil implements ServiceClass {
 					forceMuxer: argv.forceMuxer,
 					mp4: argv.mp4,
 					nocleanup: argv.nocleanup,
-					episodeNumber: ep.displayNumber ?? ep.id
+					episodeNumber
 				});
 				if (!ok) {
-					console.error('[OceanVeil] Failed to download episode', ep.id);
+					console.error('[OceanVeil] Failed to download episode', epId);
 					return;
 				}
-				downloaded({ service: 'oceanveil', type: 'srz' }, titleId, [ep.id]);
 			}
 			return;
 		}
