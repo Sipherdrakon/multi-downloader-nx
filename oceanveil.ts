@@ -103,6 +103,17 @@ interface OceanVeilNewEpisodesResponse {
 	included?: Array<{ type: string; id: string; attributes?: { name?: string } }>;
 }
 
+/** Episode API: GET /anime_episodes/:id (used to resolve title from episode id) */
+interface OceanVeilEpisodeResponse {
+	data?: {
+		type?: string;
+		id?: string;
+		attributes?: OceanVeilEpisodeAttrs;
+		relationships?: { animeTitle?: { data?: { type: string; id: string } } };
+	};
+	included?: Array<{ type: string; id: string; attributes?: { name?: string } }>;
+}
+
 /** Tags list: GET /tags?is_mature= */
 interface OceanVeilTagItem {
 	type: string;
@@ -158,9 +169,7 @@ function cookiePairsFromResponse(res?: Response): string[] {
 	const hdrs = res.headers as unknown as { getSetCookie?: () => string[]; get: (name: string) => string | null };
 	const setCookies = hdrs.getSetCookie?.() ?? [];
 	if (setCookies.length > 0) {
-		return setCookies
-			.map((c) => c.split(';')[0]?.trim())
-			.filter((c): c is string => !!c);
+		return setCookies.map((c) => c.split(';')[0]?.trim()).filter((c): c is string => !!c);
 	}
 	const single = hdrs.get('set-cookie');
 	if (!single) return [];
@@ -221,11 +230,9 @@ export default class Oceanveil implements ServiceClass {
 				const candidate = path.join(path.dirname(this.cfg.bin.ffmpeg), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe');
 				if (fs.existsSync(candidate)) ffprobeBin = candidate;
 			}
-			const probe = childProcess.spawnSync(
-				ffprobeBin,
-				['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', filePath],
-				{ encoding: 'utf-8' }
-			);
+			const probe = childProcess.spawnSync(ffprobeBin, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', filePath], {
+				encoding: 'utf-8'
+			});
 			if (probe.status !== 0 || !probe.stdout) return undefined;
 			const parsed = JSON.parse(probe.stdout) as { streams?: Array<{ width?: number; height?: number }> };
 			const stream = parsed.streams?.[0];
@@ -278,12 +285,7 @@ export default class Oceanveil implements ServiceClass {
 		return undefined;
 	}
 
-	private async apiRequest(
-		method: 'GET' | 'POST',
-		path: string,
-		body?: string,
-		isRetry = false
-	): Promise<{ ok: boolean; data?: unknown; body?: string; res?: Response }> {
+	private async apiRequest(method: 'GET' | 'POST', path: string, body?: string, isRetry = false): Promise<{ ok: boolean; data?: unknown; body?: string; res?: Response }> {
 		const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
 		const opts: reqModule.FetchParams = {
 			method,
@@ -337,30 +339,26 @@ export default class Oceanveil implements ServiceClass {
 		const lang = meta.showTitle && /Dub/i.test(meta.showTitle) ? ['eng'] : ['jpn'];
 		return {
 			isOk: true,
-			value: meta.episodes.map((ep): Episode => ({
-				e: String(ep.displayNumber ?? ep.id),
-				lang,
-				name: ep.name,
-				season: '1',
-				seasonTitle: meta.showTitle,
-				episode: String(ep.displayNumber ?? ep.id),
-				id: ep.id,
-				img: oceanVeilEpisodeImageUrl(ep.id),
-				description: '',
-				time: ''
-			}))
+			value: meta.episodes.map(
+				(ep): Episode => ({
+					e: String(ep.displayNumber ?? ep.id),
+					lang,
+					name: ep.name,
+					season: '1',
+					seasonTitle: meta.showTitle,
+					episode: String(ep.displayNumber ?? ep.id),
+					id: ep.id,
+					img: oceanVeilEpisodeImageUrl(ep.id),
+					description: '',
+					time: ''
+				})
+			)
 		};
 	}
 
 	/** Get title metadata and episode list. isMature: true = mature/NSFW catalog, false = SFW. */
-	public async getTitleMetadata(
-		titleId: string,
-		isMature = true
-	): Promise<{ showTitle: string; episodes: EpisodeInfo[] } | null> {
-		const r = await this.apiRequest(
-			'GET',
-			`/anime_titles/${titleId}?include[]=anime_episodes&include[]=genre&is_mature=${isMature}`
-		);
+	public async getTitleMetadata(titleId: string, isMature = true): Promise<{ showTitle: string; episodes: EpisodeInfo[] } | null> {
+		const r = await this.apiRequest('GET', `/anime_titles/${titleId}?include[]=anime_episodes&include[]=genre&is_mature=${isMature}`);
 		if (!r.ok || !r.data) return null;
 		const json = r.data as OceanVeilTitleResponse;
 		const data = json.data;
@@ -386,6 +384,16 @@ export default class Oceanveil implements ServiceClass {
 			});
 		}
 		return { showTitle, episodes };
+	}
+
+	/** Resolve a numeric OceanVeil episode ID to its parent title ID. */
+	public async getEpisodeTitleId(episodeId: string, isMature = true): Promise<string | null> {
+		if (!/^\d+$/.test(episodeId)) return null;
+		const r = await this.apiRequest('GET', `/anime_episodes/${episodeId}?is_mature=${isMature}&include[]=anime_title`);
+		if (!r.ok || !r.data) return null;
+		const json = r.data as OceanVeilEpisodeResponse;
+		const titleId = json.data?.relationships?.animeTitle?.data?.id;
+		return typeof titleId === 'string' && /^\d+$/.test(titleId) ? titleId : null;
 	}
 
 	/**
@@ -553,7 +561,10 @@ export default class Oceanveil implements ServiceClass {
 	/**
 	 * Resolve manifest (follow variant to media playlist), fetch key, build m3u8json and key map.
 	 */
-	private async getManifestAndKey(episodeId: string, quality = 0): Promise<{
+	private async getManifestAndKey(
+		episodeId: string,
+		quality = 0
+	): Promise<{
 		m3u8json: { segments: { uri: string; key: { uri: string; iv: number[] } }[]; mediaSequence?: number };
 		initialKeys: Record<string, Buffer>;
 		baseurl?: string;
@@ -588,24 +599,24 @@ export default class Oceanveil implements ServiceClass {
 		let baseUrl = manifestUrl.replace(/\/[^/]+$/, '/');
 		if ((manifest as { playlists?: unknown[] }).playlists?.length) {
 			const masterVariants = parseMasterVariants(manifestBody, baseUrl);
-			const rawPlaylists = (manifest as {
-				playlists: Array<{
-					uri: string;
-					attributes?: { RESOLUTION?: { width?: number; height?: number }; BANDWIDTH?: number };
-				}>;
-			}).playlists;
-			const fallbackVariants = rawPlaylists
-				.map((pl) => ({
-					uri: pl.uri.startsWith('http') ? pl.uri : new URL(pl.uri, baseUrl).href,
-					width: pl.attributes?.RESOLUTION?.width ?? 0,
-					height: pl.attributes?.RESOLUTION?.height ?? 0,
-					bandwidth: pl.attributes?.BANDWIDTH ?? 0
-				}));
-			const ranked = (masterVariants.length > 0 ? masterVariants : fallbackVariants)
-				.sort((a, b) => {
-					if (a.height !== b.height) return a.height - b.height;
-					return a.bandwidth - b.bandwidth;
-				});
+			const rawPlaylists = (
+				manifest as {
+					playlists: Array<{
+						uri: string;
+						attributes?: { RESOLUTION?: { width?: number; height?: number }; BANDWIDTH?: number };
+					}>;
+				}
+			).playlists;
+			const fallbackVariants = rawPlaylists.map((pl) => ({
+				uri: pl.uri.startsWith('http') ? pl.uri : new URL(pl.uri, baseUrl).href,
+				width: pl.attributes?.RESOLUTION?.width ?? 0,
+				height: pl.attributes?.RESOLUTION?.height ?? 0,
+				bandwidth: pl.attributes?.BANDWIDTH ?? 0
+			}));
+			const ranked = (masterVariants.length > 0 ? masterVariants : fallbackVariants).sort((a, b) => {
+				if (a.height !== b.height) return a.height - b.height;
+				return a.bandwidth - b.bandwidth;
+			});
 
 			let selectedIndex = quality === 0 ? ranked.length - 1 : quality - 1;
 			if (selectedIndex < 0) selectedIndex = 0;
@@ -915,7 +926,11 @@ export default class Oceanveil implements ServiceClass {
 				console.error('[OceanVeil] Title not found:', titleId);
 				return;
 			}
-			const epFilter = (argv.e as string | undefined)?.split(',').map((x) => x.trim()).filter(Boolean) ?? [];
+			const epFilter =
+				(argv.e as string | undefined)
+					?.split(',')
+					.map((x) => x.trim())
+					.filter(Boolean) ?? [];
 			const epMatch = (ep: EpisodeInfo) => {
 				const key = String(ep.displayNumber ?? ep.id);
 				return epFilter.includes(ep.id) || epFilter.includes(key);
@@ -963,7 +978,55 @@ export default class Oceanveil implements ServiceClass {
 
 		// -e only without series+season context
 		if (argv.e && !seriesId) {
-			console.error('[OceanVeil] Use --srz <title_id> -s 1 with -e <episode_number_or_id>.');
+			// Convenience: allow downloading by global episode ID without --srz.
+			// This only supports numeric episode IDs (the IDs shown in --new output).
+			const epIds = String(argv.e)
+				.split(',')
+				.map((x) => x.trim())
+				.filter(Boolean);
+			if (epIds.length === 0 || epIds.some((id) => !/^\d+$/.test(id))) {
+				console.error('[OceanVeil] Use --srz <title_id> -s 1 with -e <episode_number_or_id>.');
+				return;
+			}
+
+			for (const epId of epIds) {
+				const titleId = await this.getEpisodeTitleId(epId, isMature);
+				if (!titleId) {
+					console.error('[OceanVeil] Episode not found or missing title relation:', epId);
+					return;
+				}
+				const meta = await this.getTitleMetadata(titleId, isMature);
+				if (!meta) {
+					console.error('[OceanVeil] Title not found:', titleId);
+					return;
+				}
+				const ep = meta.episodes.find((e) => e.id === epId);
+				if (!ep) {
+					console.error('[OceanVeil] Episode not found in title episode list:', epId);
+					return;
+				}
+				const ok = await this.downloadEpisode(ep.id, meta.showTitle, ep.name, {
+					timeout: argv.timeout,
+					fileName: argv.fileName,
+					numbers: argv.numbers,
+					q: argv.q,
+					force: argv.force,
+					ffmpegOptions: argv.ffmpegOptions,
+					mkvmergeOptions: argv.mkvmergeOptions,
+					defaultAudio: argv.defaultAudio,
+					defaultSub: argv.defaultSub,
+					ccTag: argv.ccTag,
+					forceMuxer: argv.forceMuxer,
+					mp4: argv.mp4,
+					nocleanup: argv.nocleanup,
+					episodeNumber: ep.displayNumber ?? ep.id
+				});
+				if (!ok) {
+					console.error('[OceanVeil] Failed to download episode', ep.id);
+					return;
+				}
+				downloaded({ service: 'oceanveil', type: 'srz' }, titleId, [ep.id]);
+			}
 			return;
 		}
 		if (seriesId && !/^\d+$/.test(seriesId)) {
