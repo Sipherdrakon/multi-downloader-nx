@@ -1,12 +1,4 @@
-import {
-	AuthData,
-	CheckTokenResponse,
-	EpisodeListResponse,
-	MessageHandler,
-	ResolveItemsData,
-	SearchData,
-	SearchResponse
-} from '../../../@types/messageHandler';
+import { AuthData, CheckTokenResponse, EpisodeListResponse, MessageHandler, ResolveItemsData, SearchData, SearchResponse } from '../../../@types/messageHandler';
 import Oceanveil, { oceanVeilEpisodeImageUrl } from '../../../oceanveil';
 import { getDefault } from '../../../modules/module.args';
 import { languages } from '../../../modules/module.langsData';
@@ -59,7 +51,11 @@ class OceanveilHandler extends Base implements MessageHandler {
 		const isMature = data.sfw !== true;
 		const meta = await this.oceanveil.getTitleMetadata(titleId, isMature);
 		if (!meta) return false;
-		const epFilter = data.e?.split(',').map((x) => x.trim()).filter(Boolean) ?? [];
+		const epFilter =
+			data.e
+				?.split(',')
+				.map((x) => x.trim())
+				.filter(Boolean) ?? [];
 		const epKey = (ep: { id: string; displayNumber: string | number | null }) => String(ep.displayNumber ?? ep.id);
 		let episodes: { id: string; displayNumber: string | number | null; name: string }[];
 		if (data.but && epFilter.length > 0) {

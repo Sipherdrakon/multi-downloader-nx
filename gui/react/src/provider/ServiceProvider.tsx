@@ -42,12 +42,7 @@ const ServiceProvider: FCWithChildren = ({ children }) => {
 				<Button size="large" variant="contained" onClick={() => setService('adn')} startIcon={<Avatar src={'https://animationdigitalnetwork.com/favicon.ico'} />}>
 					AnimationDigitalNetwork
 				</Button>
-				<Button
-					size="large"
-					variant="contained"
-					onClick={() => setService('oceanveil')}
-					startIcon={<Avatar src={'https://oceanveil.net/favicon.ico'} />}
-				>
+				<Button size="large" variant="contained" onClick={() => setService('oceanveil')} startIcon={<Avatar src={'https://oceanveil.net/favicon.ico'} />}>
 					OceanVeil
 				</Button>
 			</Box>

@@ -1021,58 +1021,49 @@ export default class Oceanveil implements ServiceClass {
 				return;
 			}
 
-			// Heavy but seldom-used path: fetch all mature episodes once so we can
-			// populate episodeNumber and episodeTitle (like other services) for -e only.
+			// Targeted fetch: anime_episodes?ids[]=...&include[]=anime_title (one light request for requested episode IDs).
 			const episodeMetaById = new Map<
 				string,
 				{
 					displayNumber?: string | number | null;
 					name?: string;
 					titleName?: string;
+					animeTitleId?: string;
 				}
 			>();
 			try {
-				const allEpResp = await this.apiRequest('GET', `/anime_titles/?include[]=anime_episodes&is_mature=${isMature}`);
-				if (allEpResp.ok && allEpResp.data && typeof allEpResp.data === 'object') {
-					const json = allEpResp.data as {
+				const idsParam = epIds.map((id) => `ids%5B%5D=${encodeURIComponent(id)}`).join('&');
+				const epResp = await this.apiRequest('GET', `/anime_episodes?${idsParam}&include[]=anime_title`);
+				if (epResp.ok && epResp.data && typeof epResp.data === 'object') {
+					const json = epResp.data as {
 						data?: {
 							id?: string;
 							type?: string;
-							attributes?: { name?: string };
-							relationships?: {
-								animeEpisodes?: {
-									data?: { id?: string; type?: string }[];
-								};
-							};
+							attributes?: { displayNumber?: string | number | null; name?: string };
+							relationships?: { animeTitle?: { data?: { id?: string; type?: string } } };
 						}[];
 						included?: {
 							id?: string;
 							type?: string;
-							attributes?: { displayNumber?: string | number | null; name?: string };
+							attributes?: { name?: string };
 						}[];
 					};
-					// First, collect per-episode basic metadata (number + name)
+					const titleNameById = new Map<string, string>();
 					for (const inc of json.included || []) {
-						if (inc.type === 'animeEpisode' && inc.id) {
-							episodeMetaById.set(inc.id, {
-								displayNumber: inc.attributes?.displayNumber ?? null,
-								name: inc.attributes?.name
-							});
+						if (inc.type === 'animeTitle' && inc.id && inc.attributes?.name) {
+							titleNameById.set(inc.id, inc.attributes.name);
 						}
 					}
-					// Then, attach title names to episodes via animeTitle.relationships.animeEpisodes
-					for (const t of json.data || []) {
-						if (t.type !== 'animeTitle' || !t.id) continue;
-						const titleName = t.attributes?.name;
-						const eps = t.relationships?.animeEpisodes?.data || [];
-						for (const ref of eps) {
-							if (!ref.id || ref.type !== 'animeEpisode') continue;
-							const existing = episodeMetaById.get(ref.id) ?? {};
-							episodeMetaById.set(ref.id, {
-								...existing,
-								titleName
-							});
-						}
+					for (const ep of json.data || []) {
+						if (ep.type !== 'animeEpisode' || !ep.id) continue;
+						const titleId = ep.relationships?.animeTitle?.data?.id;
+						const titleName = titleId ? titleNameById.get(titleId) : undefined;
+						episodeMetaById.set(ep.id, {
+							displayNumber: ep.attributes?.displayNumber ?? null,
+							name: ep.attributes?.name,
+							titleName,
+							animeTitleId: titleId
+						});
 					}
 				}
 			} catch {
@@ -1113,6 +1104,9 @@ export default class Oceanveil implements ServiceClass {
 				if (!ok) {
 					console.error('[OceanVeil] Failed to download episode', epId);
 					return;
+				}
+				if (meta.animeTitleId) {
+					downloaded({ service: 'oceanveil', type: 'srz' }, meta.animeTitleId, [epId]);
 				}
 			}
 			return;

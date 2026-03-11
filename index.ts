@@ -101,7 +101,8 @@ const SERVICES: Record<string, any> = {
 		} else if (argv.service === 'oceanveil') {
 			if (argv.series === undefined) return console.error('`--srz` not found');
 			const episodes = parseSelect(argv.archiveAddEpisodes).values;
-			if (addEpisodesToArchive({ service: 'oceanveil', type: 'srz' }, argv.series as string, episodes)) console.info('Marked %s in archive for %s', episodes.join(', '), argv.series);
+			if (addEpisodesToArchive({ service: 'oceanveil', type: 'srz' }, argv.series as string, episodes))
+				console.info('Marked %s in archive for %s', episodes.join(', '), argv.series);
 			else console.error('Could not update archive (entry may not exist; add with --addArchive first)');
 		}
 	} else if (argv.downloadArchive && argv.service) {

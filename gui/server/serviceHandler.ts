@@ -55,9 +55,7 @@ export default class ServiceHandler {
 		this.ws.events.on('version', async (_, respond) => {
 			respond(packageJson.version);
 		});
-		this.ws.events.on('type', async (_, respond) =>
-			respond(this.service === undefined ? undefined : (this.service.name as 'hidive' | 'crunchy' | 'adn' | 'oceanveil'))
-		);
+		this.ws.events.on('type', async (_, respond) => respond(this.service === undefined ? undefined : (this.service.name as 'hidive' | 'crunchy' | 'adn' | 'oceanveil')));
 		this.ws.events.on('checkToken', async (_, respond) => {
 			if (this.service === undefined) return respond({ isOk: false, reason: new Error('No service selected') });
 			respond(await this.service.checkToken());

@@ -72,7 +72,10 @@ class Merger {
 		if (this.options.skipSubMux) this.options.subtitles = [];
 		if (this.options.videoTitle) this.options.videoTitle = this.options.videoTitle.replace(/"/g, "'");
 		if (this.options.subtitles.length > 0 && this.options.subTrackOrder) {
-			const order = this.options.subTrackOrder.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+			const order = this.options.subTrackOrder
+				.split(',')
+				.map((s) => s.trim().toLowerCase())
+				.filter(Boolean);
 			if (order.length > 0) {
 				const orderIdx = (type: (typeof SUB_TRACK_TYPES)[number]) => {
 					const i = order.indexOf(type);

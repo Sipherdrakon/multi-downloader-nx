@@ -223,11 +223,7 @@ const loadData = (): DataType => {
 	return {} as DataType;
 };
 
-type ArchiveKind =
-	| { service: 'crunchy'; type: 's' | 'srz' }
-	| { service: 'hidive'; type: 's' }
-	| { service: 'adn'; type: 's' }
-	| { service: 'oceanveil'; type: 'srz' };
+type ArchiveKind = { service: 'crunchy'; type: 's' | 'srz' } | { service: 'hidive'; type: 's' } | { service: 'adn'; type: 's' } | { service: 'oceanveil'; type: 'srz' };
 
 /** Remove a series/season from the archive so it is no longer included in --downloadArchive. */
 function removeFromArchive(kind: ArchiveKind, ID: string): boolean {
