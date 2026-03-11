@@ -404,10 +404,7 @@ export default class Oceanveil implements ServiceClass {
 		{
 			const limit = 50;
 			const daysAgo = 360;
-			const r = await this.apiRequest(
-				'GET',
-				`/anime_episodes/new_episodes?limit=${limit}&days_ago=${daysAgo}&is_mature=${isMature}&include[]=anime_title`
-			);
+			const r = await this.apiRequest('GET', `/anime_episodes/new_episodes?limit=${limit}&days_ago=${daysAgo}&is_mature=${isMature}&include[]=anime_title`);
 			if (!r.ok || !r.data) return null;
 			const json = r.data as OceanVeilNewEpisodesResponse;
 			const ep = (json.data || []).find((e) => e.id === episodeId);
@@ -753,7 +750,7 @@ export default class Oceanveil implements ServiceClass {
 			[],
 			options.ccTag ?? 'cc'
 		).join(path.sep);
-		let tsFile = path.join(this.cfg.dir.content, outFile + '.ts');
+		let tsFile = path.join(this.cfg.dir.tmp!, outFile + '.ts');
 		const dirName = path.dirname(tsFile);
 		if (!fs.existsSync(dirName)) {
 			fs.mkdirSync(dirName, { recursive: true });
@@ -792,7 +789,7 @@ export default class Oceanveil implements ServiceClass {
 				[],
 				options.ccTag ?? 'cc'
 			).join(path.sep);
-			const finalTs = path.join(this.cfg.dir.content, finalOutFile + '.ts');
+			const finalTs = path.join(this.cfg.dir.tmp!, finalOutFile + '.ts');
 			if (finalTs !== tsFile) {
 				const finalDir = path.dirname(finalTs);
 				if (!fs.existsSync(finalDir)) fs.mkdirSync(finalDir, { recursive: true });
@@ -805,7 +802,7 @@ export default class Oceanveil implements ServiceClass {
 
 		const defaultAudio = options.defaultAudio ?? langsData.languages.find((l) => l.code === 'jpn')!;
 		const defaultSub = options.defaultSub ?? langsData.languages.find((l) => l.code === 'eng')!;
-		const outputPath = path.join(this.cfg.dir.content, outFile + (options.mp4 ? '.mp4' : '.mkv'));
+		const outputPath = path.join(this.cfg.dir.output!, outFile + (options.mp4 ? '.mp4' : '.mkv'));
 		const merger = new Merger({
 			videoAndAudio: [{ path: tsFile, lang: defaultAudio, isPrimary: true }],
 			onlyVid: [],
@@ -850,6 +847,14 @@ export default class Oceanveil implements ServiceClass {
 		const argv = yargs.appArgv(this.cfg.cli);
 		if (argv.debug) this.debug = true;
 		this.cfg.bin = await yamlCfg.loadBinCfg();
+		if (argv.tmpDir) {
+			this.cfg.dir.tmp = path.resolve(argv.tmpDir);
+			if (!fs.existsSync(this.cfg.dir.tmp)) fs.mkdirSync(this.cfg.dir.tmp, { recursive: true });
+		}
+		if (argv.outputDir) {
+			this.cfg.dir.output = path.resolve(argv.outputDir);
+			if (!fs.existsSync(this.cfg.dir.output)) fs.mkdirSync(this.cfg.dir.output, { recursive: true });
+		}
 
 		if (argv.auth) {
 			await this.doAuth({

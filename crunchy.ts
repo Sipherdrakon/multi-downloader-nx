@@ -82,6 +82,14 @@ export default class Crunchy implements ServiceClass {
 
 		// load binaries
 		this.cfg.bin = await yamlCfg.loadBinCfg();
+		if (argv.tmpDir) {
+			this.cfg.dir.tmp = path.resolve(argv.tmpDir);
+			if (!fs.existsSync(this.cfg.dir.tmp)) fs.mkdirSync(this.cfg.dir.tmp, { recursive: true });
+		}
+		if (argv.outputDir) {
+			this.cfg.dir.output = path.resolve(argv.outputDir);
+			if (!fs.existsSync(this.cfg.dir.output)) fs.mkdirSync(this.cfg.dir.output, { recursive: true });
+		}
 		if (argv.allDubs) {
 			argv.dubLang = langsData.dubLanguageCodes;
 		}
@@ -914,7 +922,7 @@ export default class Crunchy implements ServiceClass {
 			}
 		}
 		if (item.is_premium_only) {
-			iTitle[0] = `☆ ${iTitle[0]}`;
+			iTitle[0] = `? ${iTitle[0]}`;
 		}
 		// display metadata
 		if (item.hide_metadata) {
@@ -945,7 +953,7 @@ export default class Crunchy implements ServiceClass {
 		console.info(
 			'%s%s[%s] %s%s%s',
 			''.padStart(item.isSelected ? pad - 1 : pad, ' '),
-			item.isSelected ? '✓' : '',
+			item.isSelected ? '?' : '',
 			objects_ids.join('|'),
 			iTitle.join(' - '),
 			showObjectMetadata ? ` (${oMetadata.join(', ')})` : '',
@@ -1234,7 +1242,7 @@ export default class Crunchy implements ServiceClass {
 				epNumList.ep.push(parseInt(epNum, 10));
 			}
 			const selEpId = isSpecial ? 'S' + epNumList.sp.toString().padStart(epNumLen, '0') : '' + parseInt(epNum, 10).toString().padStart(epNumLen, '0');
-			// set data: --absolute → use episode_number (absolute); else → episode or selEpId (relative). Matches itemSelectMultiDub.
+			// set data: --absolute ? use episode_number (absolute); else ? episode or selEpId (relative). Matches itemSelectMultiDub.
 			const epNumForMeta = absolute ? (typeof (item as { episode_number?: number }).episode_number === 'number' ? String((item as { episode_number: number }).episode_number) : item.episode) : (item.episode ?? selEpId);
 			const images = (item.images?.thumbnail ?? [[{ source: '/notFound.png' }]])[0];
 			const epMeta: CrunchyEpMeta = {
@@ -1496,7 +1504,11 @@ export default class Crunchy implements ServiceClass {
 				];
 				epMeta.seriesTitle = item.episode_metadata.series_title;
 				epMeta.seasonTitle = item.episode_metadata.season_title;
-				epMeta.episodeNumber = absolute ? (item.episode_metadata.episode_number != null && item.episode_metadata.episode_number !== undefined ? String(item.episode_metadata.episode_number) : item.episode_metadata.episode) : item.episode_metadata.episode;
+				// Without --absolute: use sequence_number (season-relative). With --absolute: use episode_number. Objects API may return episode as absolute.
+				const em = item.episode_metadata;
+				epMeta.episodeNumber = absolute
+					? (em.episode_number != null && em.episode_number !== undefined ? String(em.episode_number) : em.episode)
+					: (typeof em.sequence_number === 'number' && !Number.isNaN(em.sequence_number) ? String(em.sequence_number) : em.episode);
 				epMeta.episodeTitle = item.title;
 				epMeta.season = item.episode_metadata.season_number;
 			} else if (item.movie_listing_metadata) {
@@ -2428,7 +2440,7 @@ export default class Crunchy implements ServiceClass {
 						const tempFile = parseFileName(`temp-${currentVersion ? currentVersion.guid : currentMediaId}`, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(
 							path.sep
 						);
-						const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
+						const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.tmp!, tempFile);
 
 						let encryptionKeysVideo;
 						let encryptionKeysAudio;
@@ -2547,7 +2559,7 @@ export default class Crunchy implements ServiceClass {
 							const mathParts = Math.ceil(totalParts / options.partsize);
 							const mathMsg = `(${mathParts}*${options.partsize})`;
 							console.info('Total parts in video stream:', totalParts, mathMsg);
-							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
+							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
 							const dirName = path.dirname(tsFile);
 							if (!fs.existsSync(dirName)) {
 								fs.mkdirSync(dirName, { recursive: true });
@@ -2565,7 +2577,7 @@ export default class Crunchy implements ServiceClass {
 								override: options.force,
 								callback: options.callbackMaker
 									? options.callbackMaker({
-											fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.content.length) : outFile}`,
+											fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.tmp!.length) : outFile}`,
 											image: medias.image,
 											parent: {
 												title: medias.seasonTitle
@@ -2589,7 +2601,7 @@ export default class Crunchy implements ServiceClass {
 							const mathParts = Math.ceil(totalParts / options.partsize);
 							const mathMsg = `(${mathParts}*${options.partsize})`;
 							console.info('Total parts in audio stream:', totalParts, mathMsg);
-							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
+							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
 							const dirName = path.dirname(tsFile);
 							if (!fs.existsSync(dirName)) {
 								fs.mkdirSync(dirName, { recursive: true });
@@ -2607,7 +2619,7 @@ export default class Crunchy implements ServiceClass {
 								override: options.force,
 								callback: options.callbackMaker
 									? options.callbackMaker({
-											fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.content.length) : outFile}`,
+											fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.tmp!.length) : outFile}`,
 											image: medias.image,
 											parent: {
 												title: medias.seasonTitle
@@ -2889,7 +2901,7 @@ export default class Crunchy implements ServiceClass {
 								const mathParts = Math.ceil(totalParts / options.partsize);
 								const mathMsg = `(${mathParts}*${options.partsize})`;
 								console.info('Total parts in stream:', totalParts, mathMsg);
-								tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
+								tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
 								const dirName = path.dirname(tsFile);
 								if (!fs.existsSync(dirName)) {
 									fs.mkdirSync(dirName, { recursive: true });
@@ -2904,7 +2916,7 @@ export default class Crunchy implements ServiceClass {
 									override: options.force,
 									callback: options.callbackMaker
 										? options.callbackMaker({
-												fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.content.length) : outFile}`,
+												fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.tmp!.length) : outFile}`,
 												image: medias.image,
 												parent: {
 													title: medias.seasonTitle
@@ -2943,7 +2955,7 @@ export default class Crunchy implements ServiceClass {
 				try {
 					fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
 					const outFile = parseFileName(options.fileName + '.' + mMeta.lang?.name, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
-					tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
+					tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
 					const dirName = path.dirname(tsFile);
 					if (!fs.existsSync(dirName)) {
 						fs.mkdirSync(dirName, { recursive: true });
@@ -3019,7 +3031,7 @@ export default class Crunchy implements ServiceClass {
 						if (path.isAbsolute(sxData.file)) {
 							sxData.path = sxData.file;
 						} else {
-							sxData.path = path.join(this.cfg.dir.content, sxData.file);
+							sxData.path = path.join(this.cfg.dir.tmp!, sxData.file);
 						}
 						const dirName = path.dirname(sxData.path);
 						if (!fs.existsSync(dirName)) {
@@ -3241,7 +3253,7 @@ export default class Crunchy implements ServiceClass {
 											sBody = newLines.join('\n');
 										}
 
-										// Force outline thickness for ru-RU: if the 17th field (Outline) equals 2.6 → 2
+										// Force outline thickness for ru-RU: if the 17th field (Outline) equals 2.6 ? 2
 										if (langItem.cr_locale === 'ru-RU') {
 											sBody = sBody.replace(/^[ \t]*(Style:\s*[^,\n]*(?:,[^,\n]*){15}),\s*2(?:[.,]6(?:0+)?)?(\s*,)/gm, '$1,2$2');
 										}
@@ -3277,7 +3289,7 @@ export default class Crunchy implements ServiceClass {
 		return {
 			error: dlFailed,
 			data: files,
-			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.content, fileName)) || './unknown' : './unknown'
+			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.output!, fileName)) || './unknown' : './unknown'
 		};
 	}
 
@@ -3474,7 +3486,7 @@ export default class Crunchy implements ServiceClass {
 			} - Season ${item.items[0].season_number} - ${item.items[0].title}
             \r\t- Versions: ${item.items
 				.map((a, index) => {
-					return `${a.is_premium_only ? '☆ ' : ''}${item.langs?.[index]?.name ?? 'Unknown'}`;
+					return `${a.is_premium_only ? '? ' : ''}${item.langs?.[index]?.name ?? 'Unknown'}`;
 				})
 				.join(', ')}
             \r\t- Subtitles: ${[...new Set(item.items.flatMap((a) => a.subtitle_locales ?? 'None'))].join(', ')}`);
@@ -3530,7 +3542,7 @@ export default class Crunchy implements ServiceClass {
 				console.info('');
 				for (const item of movieItems) {
 					console.info(
-						`[Movie] - ${item.episodeTitle} [${item.data.map((a) => `✓ ${a.lang?.name || 'Unknown Language'}`).join(', ')}]`
+						`[Movie] - ${item.episodeTitle} [${item.data.map((a) => `? ${a.lang?.name || 'Unknown Language'}`).join(', ')}]`
 					);
 				}
 				return { isOk: true, value: movieItems };
@@ -3545,7 +3557,7 @@ export default class Crunchy implements ServiceClass {
 			console.info(
 				`[S${item.season}E${item.episodeNumber}] - ${item.episodeTitle} [${item.data
 					.map((a) => {
-						return `✓ ${a.lang?.name || 'Unknown Language'}`;
+						return `? ${a.lang?.name || 'Unknown Language'}`;
 					})
 					.join(', ')}]`
 			);

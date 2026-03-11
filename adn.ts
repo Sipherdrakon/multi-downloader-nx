@@ -71,6 +71,14 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 
 		// load binaries
 		this.cfg.bin = await yamlCfg.loadBinCfg();
+		if (argv.tmpDir) {
+			this.cfg.dir.tmp = path.resolve(argv.tmpDir);
+			if (!fs.existsSync(this.cfg.dir.tmp)) fs.mkdirSync(this.cfg.dir.tmp, { recursive: true });
+		}
+		if (argv.outputDir) {
+			this.cfg.dir.output = path.resolve(argv.outputDir);
+			if (!fs.existsSync(this.cfg.dir.output)) fs.mkdirSync(this.cfg.dir.output, { recursive: true });
+		}
 		if (argv.allDubs) {
 			argv.dubLang = langsData.dubLanguageCodes;
 		}
@@ -99,7 +107,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			}
 		} else if (argv.s && !isNaN(parseInt(argv.s, 10)) && parseInt(argv.s, 10) > 0) {
 			const selected = await this.selectShow(parseInt(argv.s), argv.e, argv.but, argv.all);
-			
+
 			// Handle raw output for show
 			if (RawOutputManager.shouldOutputRaw(argv)) {
 				await RawOutputManager.saveRawOutput({
@@ -111,7 +119,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 				});
 				return true;
 			}
-			
+
 			if (selected.isOk) {
 				for (const select of selected.value) {
 					if (!(await this.getEpisode(select, { ...argv, skipsubs: false }))) {
@@ -657,9 +665,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 					for (const pl of streamPlaylists.playlists ?? []) {
 						// set quality
 						const plResolution = pl.attributes.RESOLUTION;
-						const plResolutionText = plResolution?.width && plResolution?.height 
-							? `${plResolution.width}x${plResolution.height}` 
-							: 'unknown';
+						const plResolutionText = plResolution?.width && plResolution?.height ? `${plResolution.width}x${plResolution.height}` : 'unknown';
 						// set codecs
 						const plCodecs = pl.attributes.CODECS;
 						// parse uri
@@ -685,8 +691,8 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 						} else {
 							plStreams[plServer][plResolutionText] = pl.uri;
 						}
-					// set plQualityStr
-					const plBandwidth = Math.round((pl.attributes?.BANDWIDTH ?? 0) / 1024);
+						// set plQualityStr
+						const plBandwidth = Math.round((pl.attributes?.BANDWIDTH ?? 0) / 1024);
 						const qualityStrAdd = `${plResolutionText} (${plBandwidth}KiB/s)`;
 						const qualityStrRegx = new RegExp(qualityStrAdd.replace(/([:()/])/g, '\\$1'), 'm');
 						const qualityStrMatch = !plQuality
@@ -747,8 +753,24 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 						console.info(`Selected quality: ${Object.keys(plSelectedList).find((a) => plSelectedList[a] === selPlUrl)} @ ${plSelectedServer}`);
 						console.info('Stream URL:', selPlUrl);
 						// TODO check filename
-						fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
-						const outFile = parseFileName(options.fileName + '.' + audDub.name, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+						fileName = parseFileName(
+							options.fileName,
+							variables,
+							options.numbers,
+							options.override,
+							options.dubLang || [],
+							options.dlsubs || [],
+							options.ccTag || 'cc'
+						).join(path.sep);
+						const outFile = parseFileName(
+							options.fileName + '.' + audDub.name,
+							variables,
+							options.numbers,
+							options.override,
+							options.dubLang || [],
+							options.dlsubs || [],
+							options.ccTag || 'cc'
+						).join(path.sep);
 						console.info(`Output filename: ${outFile}`);
 						const chunkPage = await this.req.getData(selPlUrl);
 						if (!chunkPage.ok || !chunkPage.res) {
@@ -771,7 +793,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 							const mathParts = Math.ceil(totalParts / options.partsize);
 							const mathMsg = `(${mathParts}*${options.partsize})`;
 							console.info('Total parts in stream:', totalParts, mathMsg);
-							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
+							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
 							const dirName = path.dirname(tsFile);
 							if (!fs.existsSync(dirName)) {
 								fs.mkdirSync(dirName, { recursive: true });
@@ -786,7 +808,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 								override: options.force,
 								callback: options.callbackMaker
 									? options.callbackMaker({
-											fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.content.length) : outFile}`,
+											fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.tmp!.length) : outFile}`,
 											image: data.image,
 											parent: {
 												title: data.show.title
@@ -814,7 +836,9 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 				}
 			} else if (options.novids) {
 				console.info('Downloading skipped!');
-				fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+				fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(
+					path.sep
+				);
 			}
 			await this.sleep(options.waittime);
 		}
@@ -841,9 +865,25 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 
 			if (compiledChapters.length > 0) {
 				try {
-					fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
-					const outFile = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
-					const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
+					fileName = parseFileName(
+						options.fileName,
+						variables,
+						options.numbers,
+						options.override,
+						options.dubLang || [],
+						options.dlsubs || [],
+						options.ccTag || 'cc'
+					).join(path.sep);
+					const outFile = parseFileName(
+						options.fileName,
+						variables,
+						options.numbers,
+						options.override,
+						options.dubLang || [],
+						options.dlsubs || [],
+						options.ccTag || 'cc'
+					).join(path.sep);
+					const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
 					const dirName = path.dirname(tsFile);
 					if (!fs.existsSync(dirName)) {
 						fs.mkdirSync(dirName, { recursive: true });
@@ -917,7 +957,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 					if (path.isAbsolute(sxData.file)) {
 						sxData.path = sxData.file;
 					} else {
-						sxData.path = path.join(this.cfg.dir.content, sxData.file);
+						sxData.path = path.join(this.cfg.dir.tmp!, sxData.file);
 					}
 					const dirName = path.dirname(sxData.path);
 					if (!fs.existsSync(dirName)) {
@@ -996,7 +1036,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 		return {
 			error: dlFailed,
 			data: files,
-			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.content, fileName)) || './unknown' : './unknown'
+			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.output!, fileName)) || './unknown' : './unknown'
 		};
 	}
 

@@ -1,3 +1,6 @@
 content: ./videos/
 fonts: ./fonts/
+# Optional: separate temp (download/mux) and final output dirs; unset = use content for both
+# tmp: ./temp/
+# output: ./videos/
 # archive: ./config/archive.json  # Optional: Custom download history archive location

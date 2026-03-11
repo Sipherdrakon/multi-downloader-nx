@@ -256,9 +256,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		alias: 'srz',
 		describe: 'Get season list by series ID',
 		docDescribe:
-			'Requested is the ID of a show/series (not a season).' +
-			'\n- Hidive: matches Z.<id> search results' +
-			'\n- OceanVeil: title ID used with -e <episode>; optional -s 1',
+			'Requested is the ID of a show/series (not a season).' + '\n- Hidive: matches Z.<id> search results' + '\n- OceanVeil: title ID used with -e <episode>; optional -s 1',
 		service: ['crunchy', 'hidive', 'oceanveil'],
 		type: 'string',
 		usage: '${ID}'
@@ -768,6 +766,24 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		default: {
 			default: '[${service}] ${showTitle} - S${season}E${episode} [${height}p]'
 		}
+	},
+	{
+		name: 'tmpDir',
+		group: 'fileName',
+		describe: 'Directory for temporary download/mux files (segments, .ts). Defaults to content dir.',
+		docDescribe: true,
+		service: ['all'],
+		type: 'string',
+		usage: '${tmpDir}'
+	},
+	{
+		name: 'outputDir',
+		group: 'fileName',
+		describe: 'Directory for final muxed output (.mkv/.mp4). Defaults to content dir.',
+		docDescribe: true,
+		service: ['all'],
+		type: 'string',
+		usage: '${outputDir}'
 	},
 	{
 		name: 'numbers',

@@ -81,6 +81,8 @@ export let argvC: {
 	mp4: boolean;
 	skipmux: boolean | undefined;
 	fileName: string;
+	tmpDir: string | undefined;
+	outputDir: string | undefined;
 	numbers: number;
 	nosess: string;
 	debug: boolean | undefined;

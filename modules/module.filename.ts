@@ -28,13 +28,16 @@ const parseFileName = (
 	ccTag: string = 'cc',
 	baseDirLength?: number
 ): string[] => {
-	// Calculate base directory length and path if not provided
+	// Calculate base directory length and path if not provided.
+	// Use the longer of tmp and output dir so truncation keeps both temp and final paths under the limit.
 	let baseDirPath = '';
 	if (baseDirLength === undefined) {
 		try {
 			const cfg = loadCfg();
-			baseDirPath = cfg.dir.content || '';
-			baseDirLength = baseDirPath.length;
+			const outputDir = (cfg.dir.output ?? cfg.dir.content) || '';
+			const tmpDir = (cfg.dir.tmp ?? cfg.dir.content) || '';
+			baseDirPath = outputDir.length >= tmpDir.length ? outputDir : tmpDir;
+			baseDirLength = Math.max(outputDir.length, tmpDir.length);
 		} catch {
 			// Fallback to conservative estimate if config can't be loaded
 			baseDirLength = 100; // Conservative estimate for typical directory paths
@@ -43,7 +46,9 @@ const parseFileName = (
 		// If baseDirLength is provided, we still need the actual path for validation
 		try {
 			const cfg = loadCfg();
-			baseDirPath = cfg.dir.content || '';
+			const outputDir = (cfg.dir.output ?? cfg.dir.content) || '';
+			const tmpDir = (cfg.dir.tmp ?? cfg.dir.content) || '';
+			baseDirPath = outputDir.length >= tmpDir.length ? outputDir : tmpDir;
 		} catch {
 			// If we can't get the path, use a placeholder of the correct length
 			baseDirPath = 'x'.repeat(baseDirLength);

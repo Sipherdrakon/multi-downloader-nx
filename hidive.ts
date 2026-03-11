@@ -65,6 +65,14 @@ export default class Hidive implements ServiceClass {
 
 		// load binaries
 		this.cfg.bin = await yamlCfg.loadBinCfg();
+		if (argv.tmpDir) {
+			this.cfg.dir.tmp = path.resolve(argv.tmpDir);
+			if (!fs.existsSync(this.cfg.dir.tmp)) fs.mkdirSync(this.cfg.dir.tmp, { recursive: true });
+		}
+		if (argv.outputDir) {
+			this.cfg.dir.output = path.resolve(argv.outputDir);
+			if (!fs.existsSync(this.cfg.dir.output)) fs.mkdirSync(this.cfg.dir.output, { recursive: true });
+		}
 		if (argv.allDubs) {
 			argv.dubLang = langsData.dubLanguageCodes;
 		}
@@ -92,7 +100,7 @@ export default class Hidive implements ServiceClass {
 			}
 		} else if (argv.s && !isNaN(parseInt(argv.s, 10)) && parseInt(argv.s, 10) > 0) {
 			const selected = await this.selectSeason(parseInt(argv.s), argv.e, argv.but, argv.all);
-			
+
 			// Handle raw output for season
 			if (RawOutputManager.shouldOutputRaw(argv)) {
 				await RawOutputManager.saveRawOutput({
@@ -104,7 +112,7 @@ export default class Hidive implements ServiceClass {
 				});
 				return true;
 			}
-			
+
 			if (selected.isOk && selected.showData) {
 				for (const select of selected.value) {
 					//download episode
@@ -870,7 +878,9 @@ export default class Hidive implements ServiceClass {
 			return undefined;
 		}
 
-		const fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
+		const fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(
+			path.sep
+		);
 
 		console.info(`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudios[0].resolutionText}\n\tServer: ${selectedServer}`);
 		console.info(`Selected (Available) Audio Languages: ${chosenAudios.map((a) => a.language.name).join(', ')}`);
@@ -896,9 +906,17 @@ export default class Hidive implements ServiceClass {
 			const mathParts = Math.ceil(totalParts / options.partsize);
 			const mathMsg = `(${mathParts}*${options.partsize})`;
 			console.info('Total parts in video stream:', totalParts, mathMsg);
-			const tsFile = path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.content, fileName);
-			const tempFile = parseFileName(`temp-${selectedEpisode.id}`, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
-			const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
+			const tsFile = path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.tmp!, fileName);
+			const tempFile = parseFileName(
+				`temp-${selectedEpisode.id}`,
+				variables,
+				options.numbers,
+				options.override,
+				options.dubLang || [],
+				options.dlsubs || [],
+				options.ccTag || 'cc'
+			).join(path.sep);
+			const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.tmp!, tempFile);
 			const dirName = path.dirname(tsFile);
 			if (!fs.existsSync(dirName)) {
 				fs.mkdirSync(dirName, { recursive: true });
@@ -916,7 +934,7 @@ export default class Hidive implements ServiceClass {
 				override: options.force,
 				callback: options.callbackMaker
 					? options.callbackMaker({
-							fileName: `${path.isAbsolute(fileName) ? fileName.slice(this.cfg.dir.content.length) : fileName}`,
+							fileName: `${path.isAbsolute(fileName) ? fileName.slice(this.cfg.dir.tmp!.length) : fileName}`,
 							image: selectedEpisode.thumbnailUrl,
 							parent: {
 								title: selectedEpisode.seriesTitle
@@ -990,10 +1008,26 @@ export default class Hidive implements ServiceClass {
 				const mathParts = Math.ceil(totalParts / options.partsize);
 				const mathMsg = `(${mathParts}*${options.partsize})`;
 				console.info('Total parts in audio stream:', totalParts, mathMsg);
-				const tempFile = parseFileName(`temp-${selectedEpisode.id}.${chosenAudioSegments.language.name}`, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
-				const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.content, tempFile);
-				const outFile = parseFileName(options.fileName + '.' + chosenAudioSegments.language.name, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(path.sep);
-				const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.content, outFile);
+				const tempFile = parseFileName(
+					`temp-${selectedEpisode.id}.${chosenAudioSegments.language.name}`,
+					variables,
+					options.numbers,
+					options.override,
+					options.dubLang || [],
+					options.dlsubs || [],
+					options.ccTag || 'cc'
+				).join(path.sep);
+				const tempTsFile = path.isAbsolute(tempFile as string) ? tempFile : path.join(this.cfg.dir.tmp!, tempFile);
+				const outFile = parseFileName(
+					options.fileName + '.' + chosenAudioSegments.language.name,
+					variables,
+					options.numbers,
+					options.override,
+					options.dubLang || [],
+					options.dlsubs || [],
+					options.ccTag || 'cc'
+				).join(path.sep);
+				const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
 				const dirName = path.dirname(tsFile);
 				if (!fs.existsSync(dirName)) {
 					fs.mkdirSync(dirName, { recursive: true });
@@ -1011,7 +1045,7 @@ export default class Hidive implements ServiceClass {
 					override: options.force,
 					callback: options.callbackMaker
 						? options.callbackMaker({
-								fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.content.length) : outFile}`,
+								fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.tmp!.length) : outFile}`,
 								image: selectedEpisode.thumbnailUrl,
 								parent: {
 									title: selectedEpisode.seriesTitle
@@ -1100,7 +1134,7 @@ export default class Hidive implements ServiceClass {
 					if (path.isAbsolute(sxData.file)) {
 						sxData.path = sxData.file;
 					} else {
-						sxData.path = path.join(this.cfg.dir.content, sxData.file);
+						sxData.path = path.join(this.cfg.dir.tmp!, sxData.file);
 					}
 					const dirName = path.dirname(sxData.path);
 					if (!fs.existsSync(dirName)) {
@@ -1148,7 +1182,7 @@ export default class Hidive implements ServiceClass {
 		return {
 			error: dlFailed,
 			data: files,
-			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.content, fileName)) || './unknown' : './unknown'
+			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.output!, fileName)) || './unknown' : './unknown'
 		};
 	}
 

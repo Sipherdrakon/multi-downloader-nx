@@ -83,6 +83,10 @@ export type ConfigObject = {
 		fonts: string;
 		config: string;
 		archive?: string;
+		/** Temp dir for segments/intermediates; defaults to content if unset */
+		tmp?: string;
+		/** Final output dir for muxed files; defaults to content if unset */
+		output?: string;
 	};
 	bin: {
 		ffmpeg?: string;
@@ -106,6 +110,8 @@ const loadCfg = (): ConfigObject => {
 			fonts: string;
 			config: string;
 			archive?: string;
+			tmp?: string;
+			output?: string;
 		}>(dirCfgFile),
 		cli: loadYamlCfgFile<{
 			[key: string]: any;
@@ -131,7 +137,7 @@ const loadCfg = (): ConfigObject => {
 			defaultCfg.dir[key] = path.join(workingDir, defaultCfg.dir[key].replace(/^\${wdir}/, ''));
 		}
 	}
-	
+
 	// Process archive path if it exists (optional field)
 	if (defaultCfg.dir.archive && typeof defaultCfg.dir.archive === 'string') {
 		if (!path.isAbsolute(defaultCfg.dir.archive)) {
@@ -149,7 +155,22 @@ const loadCfg = (): ConfigObject => {
 	if (!fs.existsSync(defaultCfg.dir.trash)) {
 		defaultCfg.dir.trash = defaultCfg.dir.content;
 	}
-	// output
+	// Optional tmp/output dirs (default to content)
+	defaultCfg.dir.tmp = defaultCfg.dir.tmp ?? defaultCfg.dir.content;
+	defaultCfg.dir.output = defaultCfg.dir.output ?? defaultCfg.dir.content;
+	if (!path.isAbsolute(defaultCfg.dir.tmp)) {
+		defaultCfg.dir.tmp = path.join(workingDir, defaultCfg.dir.tmp.replace(/^\${wdir}/, ''));
+	}
+	if (!path.isAbsolute(defaultCfg.dir.output)) {
+		defaultCfg.dir.output = path.join(workingDir, defaultCfg.dir.output.replace(/^\${wdir}/, ''));
+	}
+	for (const d of [defaultCfg.dir.tmp, defaultCfg.dir.output]) {
+		if (d && !fs.existsSync(d)) {
+			try {
+				fs.mkdirSync(d, { recursive: true });
+			} catch (_) {}
+		}
+	}
 	return defaultCfg;
 };
 
