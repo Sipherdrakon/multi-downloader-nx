@@ -4,22 +4,31 @@ import { workingDir } from './module.cfg-loader';
 import path from 'path';
 import * as reqModule from './module.fetch';
 import Playready from 'node-playready';
-import Widevine, { KeyContainer, LicenseType } from 'widevine';
+import { Widevine, KeyContainer, LicenseType } from 'widevine';
 
 const req = new reqModule.Req();
 
-// CDM base: use contentDirectory when set and valid (e.g. Homebrew), else workingDir; fallback avoids bad path
-const cdmBase =
-	process.env.contentDirectory &&
-	(() => {
-		try {
-			return fs.existsSync(process.env.contentDirectory!) && fs.statSync(process.env.contentDirectory!).isDirectory();
-		} catch {
-			return false;
-		}
-	})()
-		? process.env.contentDirectory!
-		: workingDir;
+// CDM location: prefer keys next to the executable. Only use contentDirectory (e.g. Homebrew) when no CDM dirs exist under workingDir — otherwise dotenv-loaded .env can point at the wrong tree and break Widevine init.
+const cdmBase = (() => {
+	const contentDirOk =
+		process.env.contentDirectory &&
+		(() => {
+			try {
+				return fs.existsSync(process.env.contentDirectory!) && fs.statSync(process.env.contentDirectory!).isDirectory();
+			} catch {
+				return false;
+			}
+		})();
+
+	const hasCdmUnder = (base: string) =>
+		fs.existsSync(path.join(base, 'widevine')) || fs.existsSync(path.join(base, 'playready'));
+
+	if (hasCdmUnder(workingDir)) return workingDir;
+
+	if (contentDirOk && hasCdmUnder(process.env.contentDirectory!)) return process.env.contentDirectory!;
+
+	return workingDir;
+})();
 
 //read cdm files located in the same directory
 let widevine: Widevine | undefined, playready: Playready | undefined;
@@ -113,6 +122,7 @@ try {
 			}
 		} catch (e) {
 			console.error('Error loading Widevine CDM, malformed client blob or private key.');
+			console.error(e);
 		}
 	}
 
