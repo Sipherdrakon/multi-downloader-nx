@@ -1033,7 +1033,7 @@ export default class Oceanveil implements ServiceClass {
 			>();
 			try {
 				const idsParam = epIds.map((id) => `ids%5B%5D=${encodeURIComponent(id)}`).join('&');
-				const epResp = await this.apiRequest('GET', `/anime_episodes?${idsParam}&include[]=anime_title`);
+				const epResp = await this.apiRequest('GET', `/anime_episodes?${idsParam}&include%5B%5D=anime_title&is_mature=${isMature}`);
 				if (epResp.ok && epResp.data && typeof epResp.data === 'object') {
 					const json = epResp.data as {
 						data?: {
