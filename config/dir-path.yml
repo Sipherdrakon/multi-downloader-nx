@@ -5,7 +5,6 @@ content: ./videos/
 fonts: ./fonts/
 
 # Optional:
-# config: ./config                 # GUI: open/reveal this folder (session files, tokens, etc.)
 # archive: ./config/archive.json  # Default download-history JSON (--archive overrides)
 # tmp: ./videos/                   # Default temp/mux workspace (--tmpDir overrides)
 # output: ./videos/                # Default final mux base without --outputDir (CLI templates use content as base)
