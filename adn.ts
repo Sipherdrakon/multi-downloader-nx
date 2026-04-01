@@ -21,7 +21,7 @@ import { console } from './modules/log';
 import RawOutputManager from './modules/module.raw-output';
 import { downloaded } from './modules/module.downloadArchive';
 import parseSelect from './modules/module.parseSelect';
-import parseFileName, { Variable } from './modules/module.filename';
+import parseFileName, { Variable, resolveFinalMuxOutputBase } from './modules/module.filename';
 import { AvailableFilenameVars } from './modules/module.args';
 import Helper from './modules/module.helper';
 
@@ -74,10 +74,6 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 		if (argv.tmpDir) {
 			this.cfg.dir.tmp = path.resolve(argv.tmpDir);
 			if (!fs.existsSync(this.cfg.dir.tmp)) fs.mkdirSync(this.cfg.dir.tmp, { recursive: true });
-		}
-		if (argv.outputDir) {
-			this.cfg.dir.output = path.resolve(argv.outputDir);
-			if (!fs.existsSync(this.cfg.dir.output)) fs.mkdirSync(this.cfg.dir.output, { recursive: true });
 		}
 		if (argv.allDubs) {
 			argv.dubLang = langsData.dubLanguageCodes;
@@ -1036,7 +1032,18 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 		return {
 			error: dlFailed,
 			data: files,
-			fileName: fileName ? (path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.output!, fileName)) || './unknown' : './unknown'
+			fileName: resolveFinalMuxOutputBase({
+				fileName,
+				outputDirOption: options.outputDir as string | undefined,
+				cfgOutput: this.cfg.dir.output ?? this.cfg.dir.content!,
+				cfgContent: this.cfg.dir.content,
+				variables,
+				numbers: options.numbers,
+				override: options.override,
+				dubLang: options.dubLang || [],
+				dlsubs: options.dlsubs || [],
+				ccTag: options.ccTag || 'cc'
+			})
 		};
 	}
 

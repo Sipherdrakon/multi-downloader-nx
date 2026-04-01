@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs';
 import { AvailableFilenameVars } from './module.args';
 import { console } from './log';
 import Helper from './module.helper';
@@ -187,5 +188,51 @@ const logError = (override: string, reason: 'invalid' | 'wrongType') => {
 			console.error(`[ERROR] Invalid override \`${override}\`. It has been ignored`);
 	}
 };
+
+/**
+ * Final mux path: YAML `dir.output` (or content) unless `--outputDir` is set — then expand templates like `fileName`.
+ * Relative `outputDir` values are resolved under `cfgContent` (same as upstream PR #1233).
+ */
+export function resolveFinalMuxOutputBase(opts: {
+	fileName: string | undefined;
+	outputDirOption: string | undefined;
+	cfgOutput: string;
+	cfgContent: string;
+	variables: Variable[];
+	numbers: number;
+	override: string[];
+	dubLang: string[];
+	dlsubs: string[];
+	ccTag: string;
+}): string {
+	if (!opts.fileName) return './unknown';
+	const { fileName, outputDirOption, cfgOutput, cfgContent, variables, numbers, override, dubLang, dlsubs, ccTag } = opts;
+	let targetDir = cfgOutput || cfgContent;
+	if (outputDirOption) {
+		const parsedDir = parseFileName(outputDirOption, variables, numbers, override, dubLang, dlsubs, ccTag).join(path.sep);
+		targetDir = path.isAbsolute(parsedDir) ? parsedDir : path.join(cfgContent, parsedDir);
+		if (!fs.existsSync(targetDir)) {
+			fs.mkdirSync(targetDir, { recursive: true });
+		}
+	}
+	const absTarget = path.normalize(targetDir);
+	let finalNamePart: string;
+	if (path.isAbsolute(fileName) && outputDirOption) {
+		console.warn(
+			'[WARN] Both an absolute fileName and --outputDir are set. The final path uses the resolved output directory; fileName is normalized relative to it when possible.'
+		);
+		const normalizedFile = path.normalize(fileName);
+		const rel = path.relative(absTarget, normalizedFile);
+		if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
+			finalNamePart = rel;
+		} else {
+			console.warn('[WARN] fileName is not under the resolved output directory; using basename only.');
+			finalNamePart = path.basename(fileName);
+		}
+	} else {
+		finalNamePart = path.isAbsolute(fileName) ? path.basename(fileName) : fileName;
+	}
+	return path.join(targetDir, finalNamePart);
+}
 
 export default parseFileName;

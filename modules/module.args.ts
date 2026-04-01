@@ -779,7 +779,8 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 	{
 		name: 'outputDir',
 		group: 'fileName',
-		describe: 'Directory for final muxed output (.mkv/.mp4). Defaults to content dir.',
+		describe:
+			'Directory for final muxed output (.mkv/.mp4). Supports the same ${variables} as fileName; relative paths are under the content directory. If unset, uses dir-path output (or content).',
 		docDescribe: true,
 		service: ['all'],
 		type: 'string',

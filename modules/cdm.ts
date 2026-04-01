@@ -20,8 +20,7 @@ const cdmBase = (() => {
 			}
 		})();
 
-	const hasCdmUnder = (base: string) =>
-		fs.existsSync(path.join(base, 'widevine')) || fs.existsSync(path.join(base, 'playready'));
+	const hasCdmUnder = (base: string) => fs.existsSync(path.join(base, 'widevine')) || fs.existsSync(path.join(base, 'playready'));
 
 	if (hasCdmUnder(workingDir)) return workingDir;
 

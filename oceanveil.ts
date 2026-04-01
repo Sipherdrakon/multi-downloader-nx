@@ -20,7 +20,7 @@ import RawOutputManager from './modules/module.raw-output';
 import streamdl from './modules/hls-download';
 import { Parser } from 'm3u8-parser';
 import Helper from './modules/module.helper';
-import parseFileName, { Variable } from './modules/module.filename';
+import parseFileName, { Variable, resolveFinalMuxOutputBase } from './modules/module.filename';
 import * as langsData from './modules/module.langsData';
 import Merger, { MergerInput } from './modules/module.merger';
 import { downloaded } from './modules/module.downloadArchive';
@@ -705,6 +705,8 @@ export default class Oceanveil implements ServiceClass {
 		options: {
 			timeout?: number;
 			fileName?: string;
+			/** Template path for final mux dir; expanded per episode like fileName */
+			outputDir?: string;
 			numbers?: number;
 			q?: number;
 			episodeNumber?: string | number;
@@ -773,6 +775,7 @@ export default class Oceanveil implements ServiceClass {
 		}
 
 		// Use actual encoded dimensions when available so ${height}/${width} in filename reflect reality.
+		let variablesForOutput: Variable[] = variables;
 		const probed = this.probeVideoResolution(tsFile);
 		if (probed && (probed.height !== videoHeight || probed.width !== videoWidth)) {
 			const finalVariables: Variable[] = variables.map((v) => {
@@ -780,6 +783,7 @@ export default class Oceanveil implements ServiceClass {
 				if (v.name === 'width' && v.type === 'number') return { ...v, replaceWith: probed.width };
 				return v;
 			});
+			variablesForOutput = finalVariables;
 			const finalOutFile = parseFileName(
 				options.fileName || '[${service}] ${showTitle} - S${season}E${episode} [${height}p]',
 				finalVariables,
@@ -802,7 +806,18 @@ export default class Oceanveil implements ServiceClass {
 
 		const defaultAudio = options.defaultAudio ?? langsData.languages.find((l) => l.code === 'jpn')!;
 		const defaultSub = options.defaultSub ?? langsData.languages.find((l) => l.code === 'eng')!;
-		const outputPath = path.join(this.cfg.dir.output!, outFile + (options.mp4 ? '.mp4' : '.mkv'));
+		const outputPath = resolveFinalMuxOutputBase({
+			fileName: outFile + (options.mp4 ? '.mp4' : '.mkv'),
+			outputDirOption: options.outputDir,
+			cfgOutput: this.cfg.dir.output ?? this.cfg.dir.content!,
+			cfgContent: this.cfg.dir.content,
+			variables: variablesForOutput,
+			numbers: options.numbers ?? 2,
+			override: [],
+			dubLang: [],
+			dlsubs: [],
+			ccTag: options.ccTag ?? 'cc'
+		});
 		const merger = new Merger({
 			videoAndAudio: [{ path: tsFile, lang: defaultAudio, isPrimary: true }],
 			onlyVid: [],
@@ -851,11 +866,6 @@ export default class Oceanveil implements ServiceClass {
 			this.cfg.dir.tmp = path.resolve(argv.tmpDir);
 			if (!fs.existsSync(this.cfg.dir.tmp)) fs.mkdirSync(this.cfg.dir.tmp, { recursive: true });
 		}
-		if (argv.outputDir) {
-			this.cfg.dir.output = path.resolve(argv.outputDir);
-			if (!fs.existsSync(this.cfg.dir.output)) fs.mkdirSync(this.cfg.dir.output, { recursive: true });
-		}
-
 		if (argv.auth) {
 			await this.doAuth({
 				username: (argv.username as string) ?? (await Helper.question('[Q] Email: ')),
@@ -978,6 +988,7 @@ export default class Oceanveil implements ServiceClass {
 			const opts = {
 				timeout: argv.timeout,
 				fileName: argv.fileName,
+				outputDir: argv.outputDir,
 				numbers: argv.numbers,
 				q: argv.q,
 				force: argv.force,
@@ -1088,6 +1099,7 @@ export default class Oceanveil implements ServiceClass {
 				const ok = await this.downloadEpisode(epId, showTitle, episodeTitle, {
 					timeout: argv.timeout,
 					fileName: argv.fileName,
+					outputDir: argv.outputDir,
 					numbers: argv.numbers,
 					q: argv.q,
 					force: argv.force,

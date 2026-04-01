@@ -15,6 +15,8 @@ export type CrunchyDownloadOptions = {
 	x: number;
 	q: number;
 	fileName: string;
+	/** Final mux directory template; expanded per download like fileName */
+	outputDir?: string;
 	numbers: number;
 	partsize: number;
 	callbackMaker?: (data: DownloadInfo) => HLSCallback;
