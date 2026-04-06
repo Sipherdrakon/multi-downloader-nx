@@ -620,12 +620,19 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 				})
 			);
 
-			console.info('Playlists URL: %s', streams.links.streaming[streamName].auto);
+			const streamLinks = streams.links.streaming[streamName];
+			const streamPlaylistUrl = streamLinks.auto || streamLinks.fhd || streamLinks.hd || streamLinks.sd || streamLinks.mobile;
+			console.info('Playlists URL: %s', streamPlaylistUrl);
 
 			let tsFile = undefined;
 
 			if (!dlFailed && !options.novids) {
-				const streamPlaylistsLocationReq = await this.req.getData(streams.links.streaming[streamName].auto);
+				if (!streamPlaylistUrl) {
+					console.error(`No playlist URL found for stream '${streamName}'.`);
+					console.error(`Available keys: ${Object.keys(streamLinks || {}).join(', ') || 'none'}`);
+					return undefined;
+				}
+				const streamPlaylistsLocationReq = await this.req.getData(streamPlaylistUrl);
 				if (!streamPlaylistsLocationReq.ok || !streamPlaylistsLocationReq.res) {
 					console.error("CAN'T FETCH VIDEO PLAYLIST LOCATION!");
 					return undefined;
