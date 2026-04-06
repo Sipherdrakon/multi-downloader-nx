@@ -566,7 +566,8 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			headers: {
 				'X-Player-Token': authorization,
 				'X-Target-Distribution': this.locale
-			}
+			},
+			useProxy: true
 		});
 		if (!streamsRequest.ok || !streamsRequest.res) {
 			if (streamsRequest.error?.res!.status == 403 || streamsRequest.res?.status == 403) {
