@@ -190,7 +190,8 @@ Get Raw Show list data
 
 Requested is the ID of a show/series (not a season).
 - Hidive: matches Z.<id> search results
-- OceanVeil: title ID used with -e <episode>; optional -s 1
+- OceanVeil: numeric title ID from search/site; use with -e for episodes. Optional -s 1 only.
+  Alternatively download by API episode IDs alone with -e (no --srz); see --episode.
 #### `-s`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -208,14 +209,16 @@ Service-specific selector:
 Set the episode(s) to download from any given show.
 For multiple selection: 1-4 OR 1,2,3,4 
 For special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter
-OceanVeil: accepts episode display number (e.g. 4) or API episode ID (e.g. 2100).
+OceanVeil with --srz <title_id>: comma-separated display numbers and/or anime_episodes API IDs (from URL …/anime_episodes/<id> or --new).
+OceanVeil without --srz: comma-separated numeric API episode IDs only; requires --auth; resolves each ID via the API (official mode, not a bug).
+OceanVeil: range syntax (1-4) is not parsed here; use commas.
 #### `--extid`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
 | Crunchyroll | `--extid ${selection}` | `string` | `No`| `--externalid` | `NaN` |
 
-Set the external id to lookup/download.
-Allows you to download or view legacy Crunchyroll Ids 
+Crunchyroll only: legacy external object IDs for lookup/download.
+Not used for OceanVeil, HIDIVE, or ADN (use their --srz / -s / -e flows).
 #### `-q`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
@@ -568,6 +571,18 @@ Order of subtitle track types in the muxed file (comma-separated: signs, full, c
 Set the filename template. Use ${variable_name} to insert variables.
 You can also create folders by inserting a path seperator in the filename
 You may use 'title', 'episode', 'showTitle', 'seriesTitle', 'season', 'width', 'height', 'service' as variables.
+#### `--tmpDir`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| All | `--tmpDir ${tmpDir}` | `string` | `No`| `NaN` | `NaN` |
+
+Directory for temporary download/mux files (segments, .ts). Defaults to content dir.
+#### `--outputDir`
+| **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
+| --- | --- | --- | --- | --- | ---| 
+| All | `--outputDir ${outputDir}` | `string` | `No`| `NaN` | `NaN` |
+
+Directory for final muxed output (.mkv/.mp4). Supports the same ${variables} as fileName; relative paths are under the content directory. If unset, uses dir-path output (or content).
 #### `--numbers`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 

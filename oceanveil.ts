@@ -1134,7 +1134,11 @@ export default class Oceanveil implements ServiceClass {
 		}
 
 		console.info(
-			'No option selected or invalid value entered. Try --help. OceanVeil: --auth to login; --list-filters to see names; --search [--genre "name"] [--tags name1 name2] or [--genre-id N] [--tag-ids N M] [--sfw]; --new; --srz <title_id> [-s 1] [-e ...] [--all]; --addArchive; --downloadArchive.'
+			'No option selected or invalid value entered. Try --help. OceanVeil: --auth; --list-filters; ' +
+				'--search [--genre …] [--tags …] or [--genre-id] [--tag-ids] [--sfw]; --new; ' +
+				'--srz <title_id> [-s 1] [-e id,…] [--all] [--but]; ' +
+				'-e <episode_api_id>[,…] without --srz (logged in; IDs from --new or …/anime_episodes/<id>); ' +
+				'--addArchive; --downloadArchive. --extid is Crunchyroll-only.'
 		);
 	}
 }

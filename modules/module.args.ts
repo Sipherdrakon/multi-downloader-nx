@@ -256,7 +256,10 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		alias: 'srz',
 		describe: 'Get season list by series ID',
 		docDescribe:
-			'Requested is the ID of a show/series (not a season).' + '\n- Hidive: matches Z.<id> search results' + '\n- OceanVeil: title ID used with -e <episode>; optional -s 1',
+			'Requested is the ID of a show/series (not a season).' +
+			'\n- Hidive: matches Z.<id> search results' +
+			'\n- OceanVeil: numeric title ID from search/site; use with -e for episodes. Optional -s 1 only.' +
+			'\n  Alternatively download by API episode IDs alone with -e (no --srz); see --episode.',
 		service: ['crunchy', 'hidive', 'oceanveil'],
 		type: 'string',
 		usage: '${ID}'
@@ -282,7 +285,11 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 			'Set the episode(s) to download from any given show.' +
 			'\nFor multiple selection: 1-4 OR 1,2,3,4 ' +
 			'\nFor special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter' +
-			'\nOceanVeil: accepts episode display number (e.g. 4) or API episode ID (e.g. 2100).',
+			'\nOceanVeil with --srz <title_id>: comma-separated display numbers and/or anime_episodes API IDs' +
+			' (from URL …/anime_episodes/<id> or --new).' +
+			'\nOceanVeil without --srz: comma-separated numeric API episode IDs only; requires --auth;' +
+			' resolves each ID via the API (official mode, not a bug).' +
+			'\nOceanVeil: range syntax (1-4) is not parsed here; use commas.',
 		service: ['all'],
 		type: 'string',
 		usage: '${selection}',
@@ -291,8 +298,10 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 	{
 		name: 'extid',
 		group: 'dl',
-		describe: 'Set the external id to lookup/download',
-		docDescribe: 'Set the external id to lookup/download.' + '\nAllows you to download or view legacy Crunchyroll Ids ',
+		describe: 'Set the external id to lookup/download (Crunchyroll only)',
+		docDescribe:
+			'Crunchyroll only: legacy external object IDs for lookup/download.' +
+			'\nNot used for OceanVeil, HIDIVE, or ADN (use their --srz / -s / -e flows).',
 		service: ['crunchy'],
 		type: 'string',
 		usage: '${selection}',
