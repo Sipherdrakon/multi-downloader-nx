@@ -6,6 +6,36 @@ import { console } from './log';
 import { languages } from './module.langsData';
 
 export default class Helper {
+	private static tokenizeArguments(command: string): string[] {
+		const args: string[] = [];
+		let current = '';
+		let inQuotes = false;
+
+		for (let i = 0; i < command.length; i++) {
+			const ch = command[i];
+			if (ch === '"' && command[i - 1] !== '\\') {
+				inQuotes = !inQuotes;
+				continue;
+			}
+			if (!inQuotes && /\s/.test(ch)) {
+				if (current.length > 0) {
+					args.push(current);
+					current = '';
+				}
+				continue;
+			}
+			current += ch;
+		}
+		if (current.length > 0) {
+			args.push(current);
+		}
+		return args;
+	}
+
+	private static normalizeExecutablePath(fpath: string): string {
+		return fpath.replace(/^"(.*)"$/, '$1');
+	}
+
 	private static normalizeFilenameText(n: string): string {
 		// Normalize typographic punctuation to ASCII to avoid tool/path issues on some systems.
 		return n
@@ -129,24 +159,31 @@ export default class Helper {
 				isOk: false;
 				err: Error & { code: number };
 		  } {
-		pargs = pargs ? ' ' + pargs : '';
-		console.info(`\n> "${pname}"${pargs}${spc ? '\n' : ''}`);
+		const displayArgs = pargs ? ' ' + pargs : '';
+		console.info(`\n> "${pname}"${displayArgs}${spc ? '\n' : ''}`);
 		try {
-			if (process.platform === 'win32') {
-				childProcess.execSync('& ' + fpath + pargs, { stdio: 'inherit', shell: 'powershell.exe', windowsHide: true });
-			} else {
-				childProcess.execSync(fpath + pargs, { stdio: 'inherit' });
+			const command = Helper.normalizeExecutablePath(fpath);
+			const args = Helper.tokenizeArguments(pargs);
+			const res = childProcess.spawnSync(command, args, {
+				stdio: 'inherit',
+				windowsHide: process.platform === 'win32',
+				shell: false
+			});
+			if (res.status !== 0) {
+				const baseErr = (res.error as Error | undefined) ?? new Error(`Command failed with exit code ${res.status ?? 1}`);
+				(baseErr as Error & { code: number }).code = res.status ?? 1;
+				throw baseErr;
 			}
 			return {
 				isOk: true
 			};
 		} catch (er) {
-			const err = er as Error & { status: number };
+			const err = er as Error & { status?: number; code?: number };
 			return {
 				isOk: false,
 				err: {
 					...err,
-					code: err.status
+					code: err.code ?? err.status ?? 1
 				}
 			};
 		}
