@@ -299,9 +299,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'extid',
 		group: 'dl',
 		describe: 'Set the external id to lookup/download (Crunchyroll only)',
-		docDescribe:
-			'Crunchyroll only: legacy external object IDs for lookup/download.' +
-			'\nNot used for OceanVeil, HIDIVE, or ADN (use their --srz / -s / -e flows).',
+		docDescribe: 'Crunchyroll only: legacy external object IDs for lookup/download.' + '\nNot used for OceanVeil, HIDIVE, or ADN (use their --srz / -s / -e flows).',
 		service: ['crunchy'],
 		type: 'string',
 		usage: '${selection}',
