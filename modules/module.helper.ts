@@ -38,14 +38,16 @@ export default class Helper {
 
 	private static normalizeFilenameText(n: string): string {
 		// Normalize typographic punctuation to ASCII to avoid tool/path issues on some systems.
-		return n
-			.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
-			.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
-			.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
-			.replace(/\u2026/g, '...')
-			// Fullwidth / compatibility colons (e.g. Crunchyroll titles) confuse mkvmerge -o parsing on some setups.
-			.replace(/\uFF1A|\uFE55/g, ' - ')
-			.replace(/[\u200B-\u200D\uFEFF]/g, '');
+		return (
+			n
+				.replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "'")
+				.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
+				.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
+				.replace(/\u2026/g, '...')
+				// Fullwidth / compatibility colons (e.g. Crunchyroll titles) confuse mkvmerge -o parsing on some setups.
+				.replace(/\uFF1A|\uFE55/g, ' - ')
+				.replace(/[\u200B-\u200D\uFEFF]/g, '')
+		);
 	}
 
 	static async question(q: string) {
