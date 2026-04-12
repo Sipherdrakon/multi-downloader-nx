@@ -37,6 +37,9 @@ import { ADNStreams } from './@types/adnStreams';
 import { ADNSubtitles } from './@types/adnSubtitles';
 import { FetchParams } from './modules/module.fetch';
 
+/** Session uses this gateway; player config may return .fr/.de — mixed hosts cause 401 on player refresh. */
+const ADN_API_ORIGIN = 'https://gw.api.animationdigitalnetwork.com';
+
 export default class AnimationDigitalNetwork implements ServiceClass {
 	public cfg: yamlCfg.ConfigObject;
 	public locale: string;
@@ -139,6 +142,26 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			result += characters.charAt(Math.floor(Math.random() * characters.length));
 		}
 		return result;
+	}
+
+	/** Same host as auth/refresh/config; matches vinetrimmer ADN _align_api_host. */
+	private alignAdnGatewayUrl(url: string): string {
+		try {
+			const parsed = new URL(url);
+			if (!/^gw\.api\.animationdigitalnetwork\./i.test(parsed.hostname)) {
+				return url;
+			}
+			const origin = new URL(ADN_API_ORIGIN);
+			if (parsed.hostname.toLowerCase() === origin.hostname) {
+				return url;
+			}
+			parsed.protocol = origin.protocol;
+			parsed.hostname = origin.hostname;
+			parsed.port = '';
+			return parsed.toString();
+		} catch {
+			return url;
+		}
 	}
 
 	private parseCookies(cookiesString: string | null): Record<string, string> {
@@ -527,7 +550,8 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			console.error("You don't have access to this video!");
 			return undefined;
 		}
-		const tokenReq = await this.req.getData(configuration.player.options.user.refreshTokenUrl || 'https://gw.api.animationdigitalnetwork.com/player/refresh/token', {
+		const refreshTokenUrl = this.alignAdnGatewayUrl(configuration.player.options.user.refreshTokenUrl || `${ADN_API_ORIGIN}/player/refresh/token`);
+		const tokenReq = await this.req.getData(refreshTokenUrl, {
 			method: 'POST',
 			headers: {
 				'X-Player-Refresh-Token': `${configuration.player.options.user.refreshToken}`
@@ -543,7 +567,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			token: string;
 		};
 
-		const linksUrl = configuration.player.options.video.url || `https://gw.api.animationdigitalnetwork.com/player/video/${data.id}/link`;
+		const linksUrl = this.alignAdnGatewayUrl(configuration.player.options.video.url || `${ADN_API_ORIGIN}/player/video/${data.id}/link`);
 		const key = this.generateRandomString(16);
 		const decryptionKey = key + '7fac1178830cfe0c';
 
