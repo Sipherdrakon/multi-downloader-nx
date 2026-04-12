@@ -43,6 +43,8 @@ export default class Helper {
 			.replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, '"')
 			.replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
 			.replace(/\u2026/g, '...')
+			// Fullwidth / compatibility colons (e.g. Crunchyroll titles) confuse mkvmerge -o parsing on some setups.
+			.replace(/\uFF1A|\uFE55/g, ' - ')
 			.replace(/[\u200B-\u200D\uFEFF]/g, '');
 	}
 
@@ -67,7 +69,7 @@ export default class Helper {
 	static cleanupFilename(n: string) {
 		/* eslint-disable no-extra-boolean-cast, no-useless-escape, no-control-regex */
 		const fixingChar = '_';
-		const illegalRe = /[\/\?<>\\:\*\|"]/g;
+		const illegalRe = /[\/\?<>\\:\*\|"\uFF1A\uFE55]/g;
 		const controlRe = /[\x00-\x1f\x80-\x9f]/g;
 		const reservedRe = /^\.+$/;
 		const windowsReservedRe = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
