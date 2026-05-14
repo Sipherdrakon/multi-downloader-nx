@@ -54,11 +54,22 @@ class HidiveHandler extends Base implements MessageHandler {
 		return ['all', 'none', ...new Set(subLanguageCodesArray)];
 	}
 
+	private parseHidiveInput(id: string): { type: 'season' | 'series'; id: number } {
+		const seasonMatch = id.match(/hidive\.com\/season\/(\d+)/);
+		if (seasonMatch) return { type: 'season', id: parseInt(seasonMatch[1]) };
+		const episodeMatch = id.match(/hidive\.com\/(?:interstitial|video)\/\d+[^?]*\?.*seasonId=(\d+)/);
+		if (episodeMatch) return { type: 'season', id: parseInt(episodeMatch[1]) };
+		return { type: 'series', id: parseInt(id) };
+	}
+
 	public async resolveItems(data: ResolveItemsData): Promise<boolean> {
-		const parse = parseInt(data.id);
-		if (isNaN(parse) || parse <= 0) return false;
+		const parsed = this.parseHidiveInput(data.id);
+		if (isNaN(parsed.id) || parsed.id <= 0) return false;
 		console.debug(`Got resolve options: ${JSON.stringify(data)}`);
-		const res = await this.hidive.selectSeries(parseInt(data.id), data.e, data.but, data.all);
+		const res =
+			parsed.type === 'season'
+				? await this.hidive.selectSeason(parsed.id, data.e, data.but, data.all)
+				: await this.hidive.selectSeries(parsed.id, data.e, data.but, data.all);
 		if (!res.isOk || !res.value) return res.isOk;
 		this.addToQueue(
 			res.value.map((item) => {
@@ -80,12 +91,34 @@ class HidiveHandler extends Base implements MessageHandler {
 	}
 
 	public async listEpisodes(id: string): Promise<EpisodeListResponse> {
-		const parse = parseInt(id);
-		if (isNaN(parse) || parse <= 0) return { isOk: false, reason: new Error('The ID is invalid') };
+		const parsed = this.parseHidiveInput(id);
+		if (isNaN(parsed.id) || parsed.id <= 0) return { isOk: false, reason: new Error('The ID is invalid') };
 
-		const request = await this.hidive.listSeries(parse);
+		if (parsed.type === 'season') {
+			const request = await this.hidive.listSeason(parsed.id);
+			if (!request.isOk || !request.value) return { isOk: false, reason: new Error('Unknown upstream error, check for additional logs') };
+			return {
+				isOk: true,
+				value: request.value.map(function (item) {
+					const description = item.description.split('\r\n');
+					return {
+						e: item.episodeInformation.episodeNumber + '',
+						lang: item.offlinePlaybackLanguages ?? [],
+						name: item.title,
+						season: item.episodeInformation.seasonNumber + '',
+						seasonTitle: request.series.season.title ?? request.series.title,
+						episode: item.episodeInformation.episodeNumber + '',
+						id: item.id + '',
+						img: item.thumbnailUrl,
+						description: description ? description[0] : '',
+						time: ''
+					};
+				})
+			};
+		}
+
+		const request = await this.hidive.listSeries(parsed.id);
 		if (!request.isOk || !request.value) return { isOk: false, reason: new Error('Unknown upstream error, check for additional logs') };
-
 		return {
 			isOk: true,
 			value: request.value.map(function (item) {
@@ -110,7 +143,8 @@ class HidiveHandler extends Base implements MessageHandler {
 		this.setDownloading(true);
 		console.debug(`Got download options: ${JSON.stringify(data)}`);
 		const _default = yargs.appArgv(this.hidive.cfg.cli, true);
-		const res = await this.hidive.selectSeries(parseInt(data.id), data.e, false, false);
+		const parsed = this.parseHidiveInput(data.id);
+		const res = parsed.type === 'season' ? await this.hidive.selectSeason(parsed.id, data.e, false, false) : await this.hidive.selectSeries(parsed.id, data.e, false, false);
 		if (!res.isOk || !res.showData) return this.alertError(new Error('Download failed upstream, check for additional logs'));
 
 		for (const ep of res.value) {

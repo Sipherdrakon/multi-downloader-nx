@@ -42,6 +42,12 @@ const SearchBox: React.FC = () => {
 	React.useEffect(() => {
 		if (search.trim().length === 0) return setSearchResult({ isOk: true, value: [] });
 
+		if (store.service === 'hidive' && /hidive\.com\/(season|interstitial|video)\/\d+/.test(search.trim())) {
+			selectItem(search.trim());
+			setFocus(false);
+			return;
+		}
+
 		const timeOutId = setTimeout(async () => {
 			if (search.trim().length > 3) {
 				const searchPayload: { search: string; sfw?: boolean } = { search };
