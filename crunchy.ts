@@ -947,6 +947,9 @@ export default class Crunchy implements ServiceClass {
 		if (iMetadata.sequence_number !== undefined) {
 			console.info(''.padStart(pad + 1, ' '), '- Sequence number:', iMetadata.sequence_number);
 		}
+		if (iMetadata.audio_locale && item.type == 'episode') {
+			console.info(''.padStart(pad + 1, ' '), '- Audio:', iMetadata.audio_locale);
+		}
 		if (item.subtitle_locales) {
 			iMetadata.subtitle_locales = item.subtitle_locales;
 		}
