@@ -570,8 +570,10 @@ export default class Hidive implements ServiceClass {
 						chosenSource = 'computed';
 					}
 
-					// Available if the chosen date/time is today or in the past
-					if (chosenSource === 'display' && displayDateStr) {
+					// For past dates, be more lenient - if display date is in the past, consider it available
+					if (displayDate && displayDt < todayDt) {
+						isAvailable = true;
+					} else if (chosenSource === 'display' && displayDateStr) {
 						// Parse display datetime with user's timezone
 						const displayDateTime = new Date(displayDateStr);
 						isAvailable = displayDateTime <= now;
