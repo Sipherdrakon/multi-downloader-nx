@@ -109,7 +109,11 @@ export default class Crunchy implements ServiceClass {
 			await this.refreshToken();
 			await this.getCmsData();
 		} else if (argv.new) {
-			await this.doAnonymousAuth();
+			if (argv.searchType === 'episode') {
+				await this.doAnonymousAuth();
+			} else {
+				await this.refreshToken();
+			}
 			await this.getNewlyAdded(argv.page, argv.searchType, argv.raw, argv.rawoutput);
 		} else if (argv.search && argv.search.length > 2) {
 			await this.refreshToken();
