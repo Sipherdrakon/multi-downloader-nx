@@ -401,38 +401,57 @@ export default class Hidive implements ServiceClass {
 			return;
 		}
 
+		// Past 30 days only (no future episodes)
 		const now = new Date();
 		const from = new Date(now);
-		from.setDate(from.getDate() - 1);
+		from.setDate(from.getDate() - 30);
 		const to = new Date(now);
-		to.setDate(to.getDate() + 14);
+		to.setHours(23, 59, 59, 999); // End of today
 
-		let currentPage = 0;
+		const fromDate = from.toISOString().replace(/\.\d{3}Z$/, '');
+		const toDate = to.toISOString().replace(/\.\d{3}Z$/, '');
+
+		// Detect user's timezone
+		const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		const timezone = userTimezone || 'UTC';
+
+		let allElements: any[] = [];
 		let lastSeen: string | undefined;
-		let scheduleData: Record<string, any> | undefined;
+		let hasMore = true;
 
-		while (currentPage < page) {
+		// Fetch all pages in the date range
+		while (hasMore) {
 			const query = lastSeen
-				? new URLSearchParams({ timezone: 'America/New_York', groupsPerPage: '7', itemsPerGroup: '7', lastSeen })
-				: new URLSearchParams({ timezone: 'America/New_York', groupsPerPage: '7', itemsPerGroup: '7', from: from.toISOString().replace(/\.\d{3}Z$/, ''), to: to.toISOString().replace(/\.\d{3}Z$/, '') });
+				? new URLSearchParams({ timezone, groupsPerPage: '7', itemsPerGroup: '7', lastSeen })
+				: new URLSearchParams({
+						timezone,
+						groupsPerPage: '7',
+						itemsPerGroup: '7',
+						from: fromDate,
+						to: toDate
+					});
 
 			const scheduleReq = await this.apiReq(`/v1/view/schedule?${query}`, '', 'auth', 'GET');
 			if (!scheduleReq.ok || !scheduleReq.res) {
 				console.error('Failed to get HIDIVE schedule!');
 				return;
 			}
-			scheduleData = JSON.parse(await scheduleReq.res.text());
-			currentPage++;
+			const pageData = JSON.parse(await scheduleReq.res.text());
+			
+			// Collect elements from this page
+			const elements = pageData?.elements ?? [];
+			allElements.push(...elements);
 
-			if (currentPage >= page) break;
-
-			const groupList = scheduleData?.elements?.find((el: Record<string, any>) => el.$type === 'groupList');
+			// Check for pagination
+			const groupList = elements.find((el: Record<string, any>) => el.$type === 'groupList');
 			lastSeen = groupList?.attributes?.actions?.next?.data?.lastSeen;
 			if (!lastSeen) {
-				console.warn('No more schedule pages available.');
-				break;
+				hasMore = false;
 			}
 		}
+
+		// Combine all pages into single response structure
+		const scheduleData = { elements: allElements };
 
 		if (!scheduleData) return;
 
@@ -460,28 +479,76 @@ export default class Hidive implements ServiceClass {
 				const rawId: string = card?.attributes?.action?.data?.id ?? '';
 				const epId = rawId.replace(/^VOD#/, '');
 
+				// Extract audio language for sub/dub detection
+				let audioLanguage = '';
+				let subDubType = '';
+				// Look for tagList elements that contain audio language info
+				const tagListElements = contentElems.filter((e) => e.$type === 'tagList');
+				for (const tagList of tagListElements) {
+					const tags = tagList?.attributes?.tags ?? [];
+					for (const tag of tags) {
+						if (tag.$type === 'tag' && tag.attributes?.icon?.attributes?.icon === 'AUDIO') {
+							audioLanguage = tag.attributes?.text?.attributes?.text ?? '';
+							subDubType = audioLanguage === 'ja-JP' ? 'SIMULCAST' : audioLanguage === 'en-US' ? 'DUB' : '';
+							break;
+						}
+					}
+					if (subDubType) break;
+				}
+
+				// Smart availability logic
+				const actionData = card?.attributes?.action?.data ?? {};
+				const computedReleases = actionData?.computedReleases ?? [];
+				let isAvailable = false;
+				let scheduledAt = '';
+
+				if (computedReleases.length > 0) {
+					const computedDate = new Date(computedReleases[0].scheduledAt);
+					scheduledAt = computedDate.toISOString();
+					// Episode is available if computed time is in the past
+					isAvailable = computedDate <= now;
+				} else {
+					// No computed releases means it's already available
+					isAvailable = true;
+				}
+
+				// Skip if not available (past episodes only)
+				if (!isAvailable) continue;
+
 				let displayLine: string;
-				if (epId) {
+				let seriesTitle = '';
+				let seasonNum: number | undefined;
+				let epNum: number | undefined;
+				let episodeTitle = '';
+
+				// Try to extract basic info from content first
+				const titleText = contentElems[1]?.attributes?.text ?? actionData?.title ?? '';
+				const episodeMatch = titleText.match(/^E(\d+)\s*-\s*(.+)/);
+				if (episodeMatch) {
+					epNum = parseInt(episodeMatch[1]);
+					episodeTitle = episodeMatch[2];
+				}
+
+				// Only fetch VOD details if essential info is missing
+				const needsVodDetails = !seriesTitle || !seasonNum || !episodeTitle;
+				if (epId && needsVodDetails) {
 					const vodReq = await this.apiReq(`/v4/vod/${epId}`, '', 'auth', 'GET');
 					if (vodReq.ok && vodReq.res) {
 						const vodData = JSON.parse(await vodReq.res.text());
 						const epInfo = vodData?.episodeInformation ?? {};
-						const seriesTitle: string = epInfo?.seriesInformation?.title ?? '';
-						const seasonNum: number | undefined = epInfo?.seasonNumber;
-						const epNum: number | undefined = epInfo?.episodeNumber;
-						const rawTitle: string = vodData?.title ?? '';
-						const cleanTitle = rawTitle.replace(/^E\d+\s*-\s*/, '').trim() || rawTitle;
-						const epLabel = (seasonNum != null && epNum != null) ? `S${seasonNum}E${epNum}` : '';
-						const parts = [seriesTitle, epLabel, cleanTitle].filter(Boolean);
-						displayLine = `    [E.${epId}] ${parts.join(' - ')}`;
-					} else {
-						const fallback: string = contentElems[1]?.attributes?.text ?? card?.attributes?.action?.data?.title ?? 'Unknown';
-						displayLine = `    [E.${epId}] ${fallback}`;
+						seriesTitle = seriesTitle || (epInfo?.seriesInformation?.title ?? '');
+						seasonNum = seasonNum || epInfo?.seasonNumber;
+						epNum = epNum || epInfo?.episodeNumber;
+						const rawTitle = vodData?.title ?? titleText;
+						episodeTitle = episodeTitle || rawTitle.replace(/^E\d+\s*-\s*/, '').trim() || rawTitle;
 					}
-				} else {
-					const fallback: string = contentElems[1]?.attributes?.text ?? card?.attributes?.action?.data?.title ?? 'Unknown';
-					displayLine = `    [E:?] ${fallback}`;
 				}
+
+				// Build display line
+				const epLabel = (seasonNum != null && epNum != null) ? `S${seasonNum}E${epNum}` : '';
+				const parts = [seriesTitle, epLabel, episodeTitle].filter(Boolean);
+				const typeSuffix = subDubType ? ` [${subDubType}]` : '';
+				displayLine = `    [E.${epId}] ${parts.join(' - ')}${typeSuffix}`;
 
 				console.info(displayLine);
 				if (airTime) console.info(`      - Air time: ${airTime}`);
