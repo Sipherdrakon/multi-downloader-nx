@@ -437,7 +437,7 @@ export default class Hidive implements ServiceClass {
 				return;
 			}
 			const pageData = JSON.parse(await scheduleReq.res.text());
-			
+
 			// Collect elements from this page
 			const elements = pageData?.elements ?? [];
 			allElements.push(...elements);
@@ -468,11 +468,26 @@ export default class Hidive implements ServiceClass {
 			return;
 		}
 
-		const groupList = scheduleData.elements?.find((el: Record<string, any>) => el.$type === 'groupList');
+		// Find all groupList elements from all pages and merge their groups
+		const allGroups: any[] = [];
+		for (const element of scheduleData.elements) {
+			if (element.$type === 'groupList' && element.attributes?.groups) {
+				allGroups.push(...element.attributes.groups);
+			}
+		}
+
+		// Create a merged groupList with all groups from all pages
+		const mergedGroupList = {
+			$type: 'groupList',
+			attributes: {
+				groups: allGroups
+			}
+		};
 		console.info('HIDIVE Schedule:');
-		for (const group of groupList?.attributes?.groups ?? []) {
+		for (const group of mergedGroupList?.attributes?.groups ?? []) {
 			const groupDate: string = group.id ?? '';
 			if (groupDate) console.info(`\n  [${groupDate}]`);
+
 			for (const card of group?.attributes?.cards ?? []) {
 				const contentElems: Record<string, any>[] = card?.attributes?.content?.[0]?.attributes?.elements ?? [];
 				const airTime: string = contentElems.find((e) => e.attributes?.format === 'date-time')?.attributes?.text ?? '';
@@ -496,20 +511,82 @@ export default class Hidive implements ServiceClass {
 					if (subDubType) break;
 				}
 
-				// Smart availability logic
+				// Smart availability logic - compare display vs computed dates (Python CLI logic)
 				const actionData = card?.attributes?.action?.data ?? {};
 				const computedReleases = actionData?.computedReleases ?? [];
 				let isAvailable = false;
-				let scheduledAt = '';
+				let displayDate: string | undefined;
+				let computedDate: string | undefined;
+				let displayDateStr: string | undefined;
 
+				// Extract display date from content
+				const dateElement = contentElems.find((e) => e.attributes?.format === 'date-time');
+				if (dateElement) {
+					displayDateStr = dateElement.attributes?.text ?? '';
+					if (displayDateStr && displayDateStr.includes('T')) {
+						displayDate = displayDateStr.split('T')[0];
+					}
+				}
+
+				// Extract computed date from computedReleases
 				if (computedReleases.length > 0) {
-					const computedDate = new Date(computedReleases[0].scheduledAt);
-					scheduledAt = computedDate.toISOString();
-					// Episode is available if computed time is in the past
-					isAvailable = computedDate <= now;
+					const scheduledAt = computedReleases[0].scheduledAt;
+					if (scheduledAt) {
+						// Handle both ISO format (2026-05-26T13:30:00Z) and US format (6/10/2026 5:00:00 PM)
+						if (scheduledAt.includes('T')) {
+							computedDate = scheduledAt.split('T')[0];
+						} else {
+							// Parse US format and convert to ISO
+							const usDateMatch = scheduledAt.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+							if (usDateMatch) {
+								const [, month, day, year] = usDateMatch;
+								computedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+							}
+						}
+					}
+				}
+
+				// Determine availability using the same logic as Python CLI
+				const today = now.toISOString().split('T')[0];
+
+				if (displayDate && computedDate) {
+					// Calculate days difference from today for both dates
+					const displayDt = new Date(displayDate);
+					const computedDt = new Date(computedDate);
+					const todayDt = new Date(today);
+
+					const displayDiff = Math.abs((displayDt.getTime() - todayDt.getTime()) / (1000 * 60 * 60 * 24));
+					const computedDiff = Math.abs((computedDt.getTime() - todayDt.getTime()) / (1000 * 60 * 60 * 24));
+
+					// Use the date closer to today
+					let chosenDate: string;
+					let chosenSource: string;
+
+					if (displayDiff <= computedDiff) {
+						chosenDate = displayDate;
+						chosenSource = 'display';
+					} else {
+						chosenDate = computedDate;
+						chosenSource = 'computed';
+					}
+
+					// Available if the chosen date/time is today or in the past
+					if (chosenSource === 'display' && displayDateStr) {
+						// Parse display datetime with user's timezone
+						const displayDateTime = new Date(displayDateStr);
+						isAvailable = displayDateTime <= now;
+					} else if (chosenSource === 'computed' && computedReleases[0].scheduledAt) {
+						// Parse computed datetime with UTC
+						const computedDateTime = new Date(computedReleases[0].scheduledAt);
+						isAvailable = computedDateTime <= now;
+					} else {
+						// Fallback to date-only comparison
+						const chosenDt = new Date(chosenDate);
+						isAvailable = chosenDt <= todayDt;
+					}
 				} else {
-					// No computed releases means it's already available
-					isAvailable = true;
+					// Fallback to original logic if we don't have both dates
+					isAvailable = computedReleases.length === 0;
 				}
 
 				// Skip if not available (past episodes only)
@@ -545,7 +622,7 @@ export default class Hidive implements ServiceClass {
 				}
 
 				// Build display line
-				const epLabel = (seasonNum != null && epNum != null) ? `S${seasonNum}E${epNum}` : '';
+				const epLabel = seasonNum != null && epNum != null ? `S${seasonNum}E${epNum}` : '';
 				const parts = [seriesTitle, epLabel, episodeTitle].filter(Boolean);
 				const typeSuffix = subDubType ? ` [${subDubType}]` : '';
 				displayLine = `    [E.${epId}] ${parts.join(' - ')}${typeSuffix}`;
