@@ -109,7 +109,7 @@ export default class Crunchy implements ServiceClass {
 			await this.refreshToken();
 			await this.getCmsData();
 		} else if (argv.new) {
-			await this.refreshToken();
+			await this.doAnonymousAuth();
 			await this.getNewlyAdded(argv.page, argv.searchType, argv.raw, argv.rawoutput);
 		} else if (argv.search && argv.search.length > 2) {
 			await this.refreshToken();
@@ -896,6 +896,9 @@ export default class Crunchy implements ServiceClass {
 			if (!iMetadata.hide_season_title && iMetadata.season_title) {
 				iTitle.unshift(iMetadata.season_title);
 			}
+			if (iMetadata.series_title && iMetadata.series_title !== iMetadata.season_title) {
+				iTitle.unshift(iMetadata.series_title);
+			}
 		}
 		if (item.is_premium_only) {
 			iTitle[0] = `? ${iTitle[0]}`;
@@ -937,6 +940,12 @@ export default class Crunchy implements ServiceClass {
 		);
 		if (item.last_public) {
 			console.info(''.padStart(pad + 1, ' '), '- Last updated:', item.last_public);
+		}
+		if (iMetadata.premium_available_date) {
+			console.info(''.padStart(pad + 1, ' '), '- Premium available:', iMetadata.premium_available_date);
+		}
+		if (iMetadata.sequence_number !== undefined) {
+			console.info(''.padStart(pad + 1, ' '), '- Sequence number:', iMetadata.sequence_number);
 		}
 		if (item.subtitle_locales) {
 			iMetadata.subtitle_locales = item.subtitle_locales;
@@ -1091,9 +1100,10 @@ export default class Crunchy implements ServiceClass {
 			return;
 		}
 
+		const isEpisodeFeed = (type || 'series') === 'episode';
 		console.info('Newly added:');
 		for (const i of newlyAddedResults.items) {
-			await this.logObject(i, 2);
+			await this.logObject(i, 2, !isEpisodeFeed);
 		}
 		// calculate pages
 		const itemPad = parseInt(new URL(newlyAddedResults.__href__, domain.cr_api).searchParams.get('start') as string);

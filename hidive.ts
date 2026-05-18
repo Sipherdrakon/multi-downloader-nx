@@ -131,7 +131,7 @@ export default class Hidive implements ServiceClass {
 				}
 			}
 		} else if (argv.new) {
-			console.error('--new is not yet implemented in the new API');
+			await this.getNewlyAdded(argv.page, argv.raw, argv.rawoutput);
 		} else if (argv.e) {
 			if (!(await this.downloadSingleEpisode(parseInt(argv.e), { ...argv }))) {
 				console.error(`Unable to download selected episode ${argv.e}`);
@@ -393,6 +393,100 @@ export default class Hidive implements ServiceClass {
 					};
 				})
 		};
+	}
+
+	public async getNewlyAdded(page = 1, raw = false, rawoutput?: string) {
+		if (!(await this.doAnonymousAuth())) {
+			console.error('Authentication failed!');
+			return;
+		}
+
+		const now = new Date();
+		const from = new Date(now);
+		from.setDate(from.getDate() - 1);
+		const to = new Date(now);
+		to.setDate(to.getDate() + 14);
+
+		let currentPage = 0;
+		let lastSeen: string | undefined;
+		let scheduleData: Record<string, any> | undefined;
+
+		while (currentPage < page) {
+			const query = lastSeen
+				? new URLSearchParams({ timezone: 'America/New_York', groupsPerPage: '7', itemsPerGroup: '7', lastSeen })
+				: new URLSearchParams({ timezone: 'America/New_York', groupsPerPage: '7', itemsPerGroup: '7', from: from.toISOString().replace(/\.\d{3}Z$/, ''), to: to.toISOString().replace(/\.\d{3}Z$/, '') });
+
+			const scheduleReq = await this.apiReq(`/v1/view/schedule?${query}`, '', 'auth', 'GET');
+			if (!scheduleReq.ok || !scheduleReq.res) {
+				console.error('Failed to get HIDIVE schedule!');
+				return;
+			}
+			scheduleData = JSON.parse(await scheduleReq.res.text());
+			currentPage++;
+
+			if (currentPage >= page) break;
+
+			const groupList = scheduleData?.elements?.find((el: Record<string, any>) => el.$type === 'groupList');
+			lastSeen = groupList?.attributes?.actions?.next?.data?.lastSeen;
+			if (!lastSeen) {
+				console.warn('No more schedule pages available.');
+				break;
+			}
+		}
+
+		if (!scheduleData) return;
+
+		if (raw) {
+			console.info(JSON.stringify(scheduleData, null, 2));
+			if (rawoutput) {
+				try {
+					fs.writeFileSync(rawoutput, JSON.stringify(scheduleData), { encoding: 'utf-8' });
+					console.info(`Raw output saved to ${rawoutput}`);
+				} catch (e) {
+					console.error(`Failed to save raw output to ${rawoutput}:`, e);
+				}
+			}
+			return;
+		}
+
+		const groupList = scheduleData.elements?.find((el: Record<string, any>) => el.$type === 'groupList');
+		console.info('HIDIVE Schedule:');
+		for (const group of groupList?.attributes?.groups ?? []) {
+			const groupDate: string = group.id ?? '';
+			if (groupDate) console.info(`\n  [${groupDate}]`);
+			for (const card of group?.attributes?.cards ?? []) {
+				const contentElems: Record<string, any>[] = card?.attributes?.content?.[0]?.attributes?.elements ?? [];
+				const airTime: string = contentElems.find((e) => e.attributes?.format === 'date-time')?.attributes?.text ?? '';
+				const rawId: string = card?.attributes?.action?.data?.id ?? '';
+				const epId = rawId.replace(/^VOD#/, '');
+
+				let displayLine: string;
+				if (epId) {
+					const vodReq = await this.apiReq(`/v4/vod/${epId}`, '', 'auth', 'GET');
+					if (vodReq.ok && vodReq.res) {
+						const vodData = JSON.parse(await vodReq.res.text());
+						const epInfo = vodData?.episodeInformation ?? {};
+						const seriesTitle: string = epInfo?.seriesInformation?.title ?? '';
+						const seasonNum: number | undefined = epInfo?.seasonNumber;
+						const epNum: number | undefined = epInfo?.episodeNumber;
+						const rawTitle: string = vodData?.title ?? '';
+						const cleanTitle = rawTitle.replace(/^E\d+\s*-\s*/, '').trim() || rawTitle;
+						const epLabel = (seasonNum != null && epNum != null) ? `S${seasonNum}E${epNum}` : '';
+						const parts = [seriesTitle, epLabel, cleanTitle].filter(Boolean);
+						displayLine = `    [E.${epId}] ${parts.join(' - ')}`;
+					} else {
+						const fallback: string = contentElems[1]?.attributes?.text ?? card?.attributes?.action?.data?.title ?? 'Unknown';
+						displayLine = `    [E.${epId}] ${fallback}`;
+					}
+				} else {
+					const fallback: string = contentElems[1]?.attributes?.text ?? card?.attributes?.action?.data?.title ?? 'Unknown';
+					displayLine = `    [E:?] ${fallback}`;
+				}
+
+				console.info(displayLine);
+				if (airTime) console.info(`      - Air time: ${airTime}`);
+			}
+		}
 	}
 
 	public async getSeries(id: number) {

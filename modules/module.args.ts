@@ -121,7 +121,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 	{
 		group: 'search',
 		name: 'new',
-		describe: 'Get last updated series list',
+		describe: 'Get newly added content (use --search-type episode for episode feed with air dates)',
 		docDescribe: true,
 		service: ['crunchy', 'hidive', 'oceanveil'],
 		type: 'boolean',
@@ -692,7 +692,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		name: 'waittime',
 		group: 'dl',
 		type: 'number',
-		describe: 'Set the time the program waits between downloads. Set in millisecods',
+		describe: 'Set the time the program waits between downloads. Set in milliseconds',
 		docDescribe: true,
 		service: ['crunchy', 'hidive'],
 		usage: '${waittime}',
