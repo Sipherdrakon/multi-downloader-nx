@@ -97,7 +97,7 @@ Set the local that will be used for the API.
 | --- | --- | --- | --- | --- | ---| 
 | Crunchyroll, Hidive, OceanVeil | `--new ` | `boolean` | `No`| `NaN` | `NaN` |
 
-Get last updated series list
+Get newly added content (use --search-type episode for episode feed with air dates)
 #### `--sfw`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
 | --- | --- | --- | --- | --- | ---| 
@@ -417,7 +417,7 @@ Set the timeout of all download reqests. Set in millisecods
 | --- | --- | --- | --- | --- | --- | ---| 
 | Crunchyroll, Hidive | `--waittime ${waittime}` | `number` | `No`| `NaN` | `0`| `waittime: ` |
 
-Set the time the program waits between downloads. Set in millisecods
+Set the time the program waits between downloads. Set in milliseconds
 #### `--simul`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **Default** |**cli-default Entry**
 | --- | --- | --- | --- | --- | --- | ---| 
