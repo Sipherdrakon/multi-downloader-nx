@@ -3811,7 +3811,7 @@ export default class Crunchy implements ServiceClass {
 					}
 				}
 
-				if (item.playback && ((but && !doEpsFilter.isSelected([epNum, item.id])) || all || (doEpsFilter.isSelected([epNum, item.id]) && !but))) {
+				if (((but && !doEpsFilter.isSelected([epNum, item.id])) || all || (doEpsFilter.isSelected([epNum, item.id]) && !but))) {
 					if (Object.prototype.hasOwnProperty.call(ret, key)) {
 						const epMe = ret[key];
 						epMe.data.push({
