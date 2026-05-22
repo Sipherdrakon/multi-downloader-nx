@@ -1072,17 +1072,30 @@ export default class Crunchy implements ServiceClass {
 			console.error('Authentication required!');
 			return;
 		}
+
+		const isEpisodeFeed = (type || 'series') === 'episode';
+		const startTime = Date.now();
+
+		// Pre-fetch auth silently if episode feed, so fallback doesn't log mid-list
+		if (isEpisodeFeed) {
+			await this.refreshToken(true, true);
+		}
+
 		const newlyAddedReqOpts = {
 			headers: {
 				Authorization: `Bearer ${this.token.access_token}`,
 				...api.crunchyDefHeader
 			}
 		};
+		// Different limits for series vs episodes
+		const itemsPerPage = isEpisodeFeed ? '500' : '25';
+		const paginationSize = isEpisodeFeed ? 500 : 25;
+
 		const newlyAddedParams = new URLSearchParams({
 			sort_by: 'newly_added',
 			type: type || 'series',
-			n: '50',
-			start: (page ? (page - 1) * 25 : 0).toString(),
+			n: itemsPerPage,
+			start: (page ? (page - 1) * paginationSize : 0).toString(),
 			preferred_audio_language: 'ja-JP',
 			force_locale: '',
 			locale: this.locale
@@ -1107,16 +1120,127 @@ export default class Crunchy implements ServiceClass {
 			return;
 		}
 
-		const isEpisodeFeed = (type || 'series') === 'episode';
+		const cutoffDate = new Date();
+		cutoffDate.setDate(cutoffDate.getDate() - 7);
+
 		console.info('Newly added:');
 		for (const i of newlyAddedResults.items) {
+			if (isEpisodeFeed) {
+				const premDate = i.episode_metadata?.premium_available_date ?? i.premium_available_date;
+				if (!premDate || new Date(premDate) < cutoffDate) continue;
+			}
 			await this.logObject(i, 2, !isEpisodeFeed);
 		}
+
+		// Fallback runs BEFORE the total line, and auth is already fresh so no mid-list logging
+		if (isEpisodeFeed) {
+			await this.getRecentEpisodesFallback(newlyAddedResults.items);
+		}
+
 		// calculate pages
 		const itemPad = parseInt(new URL(newlyAddedResults.__href__, domain.cr_api).searchParams.get('start') as string);
-		const pageCur = itemPad > 0 ? Math.ceil(itemPad / 25) + 1 : 1;
-		const pageMax = Math.ceil(newlyAddedResults.total / 25);
-		console.info(`  Total results: ${newlyAddedResults.total} (Page: ${pageCur}/${pageMax})`);
+		const pageCur = itemPad > 0 ? Math.ceil(itemPad / paginationSize) + 1 : 1;
+		const pageMax = Math.ceil(newlyAddedResults.total / paginationSize);
+		const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+		console.info(`  Total results: ${newlyAddedResults.total} (Page: ${pageCur}/${pageMax}) [${elapsed}s]`);
+	}
+
+	private async getRecentEpisodesFallback(existingItems: any[]) {
+		try {
+			const cutoffDate = new Date();
+			cutoffDate.setDate(cutoffDate.getDate() - 7);
+
+			// Collect existing episode IDs
+			const existingEpisodeIds = new Set<string>(existingItems.map((item) => item.id).filter(Boolean));
+
+			// Collect series IDs from feed items (only from this week)
+			const seriesIds = new Set<string>();
+			for (const item of existingItems) {
+				const uploadDate = item.episode_metadata?.premium_available_date ?? item.premium_available_date;
+				if (!uploadDate) continue;
+				if (new Date(uploadDate) < cutoffDate) continue;
+				const sid = item.episode_metadata?.series_id ?? item.series_id;
+				if (sid) seriesIds.add(sid);
+			}
+
+			if (seriesIds.size === 0) return;
+
+			// Auth is already fresh from getNewlyAdded — no refreshToken call here
+			const AuthHeaders = {
+				headers: {
+					Authorization: `Bearer ${this.token.access_token}`,
+					...api.crunchyDefHeader
+				}
+			};
+
+			const seriesArr = [...seriesIds];
+			const CONCURRENCY = 5;
+			let checked = 0;
+			process.stdout.write(`  Checking ${seriesArr.length} series for unlisted recent episodes... (0/${seriesArr.length})\r`);
+
+			const checkSeries = async (seriesId: string): Promise<any[]> => {
+				const found: any[] = [];
+				try {
+					const seasonsReq = await this.req.getData(
+						`${api.content_cms}/series/${seriesId}/seasons?force_locale=&preferred_audio_language=ja-JP&locale=${this.locale}`,
+						AuthHeaders
+					);
+					if (!seasonsReq.ok || !seasonsReq.res) return found;
+					const seasonsData = await seasonsReq.res.json();
+					if (!seasonsData?.data?.length) return found;
+
+					// Check all seasons in parallel
+					const seasons: any[] = seasonsData.data;
+
+					const fetchSeasonEpisodes = async (season: any): Promise<any[]> => {
+						const params = new URLSearchParams();
+						params.set('force_locale', '');
+						params.set('preferred_audio_language', 'ja-JP');
+						params.set('locale', this.locale);
+						params.set('season_id', season.id);
+						if (this.cmsToken.cms?.policy) params.set('Policy', this.cmsToken.cms.policy);
+						if (this.cmsToken.cms?.signature) params.set('Signature', this.cmsToken.cms.signature);
+						if (this.cmsToken.cms?.key_pair_id) params.set('Key-Pair-Id', this.cmsToken.cms.key_pair_id);
+						const reqEpsOpts = [api.cms_bucket, this.cmsToken.cms?.bucket, '/episodes?', params.toString()].join('');
+						const epsReq = await this.req.getData(reqEpsOpts, AuthHeaders);
+						if (!epsReq.ok || !epsReq.res) return [];
+						const epsData = await epsReq.res.json();
+						return epsData?.items ?? [];
+					};
+
+					const episodeLists = await Promise.all(seasons.map((season) => fetchSeasonEpisodes(season)));
+					for (const episodes of episodeLists) {
+						for (const episode of episodes) {
+							const uploadDate = episode.premium_available_date ?? episode.upload_date;
+							if (!uploadDate || new Date(uploadDate) < cutoffDate) continue;
+							if (existingEpisodeIds.has(episode.id)) continue;
+							existingEpisodeIds.add(episode.id);
+							episode.external_id = `EPI.${episode.id}`;
+							episode.is_premium_only = false;
+							found.push(episode);
+						}
+					}
+				} catch (error) {
+					if (this.debug) console.warn(`Failed to fetch data for series ${seriesId}:`, error);
+				}
+				return found;
+			};
+
+			for (let i = 0; i < seriesArr.length; i += CONCURRENCY) {
+				const batch = seriesArr.slice(i, i + CONCURRENCY);
+				const results = await Promise.all(batch.map((sid) => checkSeries(sid)));
+				checked += batch.length;
+				process.stdout.write(`  Checking ${seriesArr.length} series for unlisted recent episodes... (${checked}/${seriesArr.length})\r`);
+				for (const episodes of results) {
+					for (const episode of episodes) {
+						await this.logObject(episode, 2, false);
+					}
+				}
+			}
+			process.stdout.write(' '.repeat(70) + '\r');
+		} catch (error) {
+			console.error('Error in fallback episode fetch:', error);
+		}
 	}
 
 	public async getSeasonById(id: string, numbers: number, e: string | undefined, but: boolean, all: boolean, absolute?: boolean): Promise<ResponseBase<CrunchyEpMeta[]>> {
@@ -3811,7 +3935,7 @@ export default class Crunchy implements ServiceClass {
 					}
 				}
 
-				if (((but && !doEpsFilter.isSelected([epNum, item.id])) || all || (doEpsFilter.isSelected([epNum, item.id]) && !but))) {
+				if ((but && !doEpsFilter.isSelected([epNum, item.id])) || all || (doEpsFilter.isSelected([epNum, item.id]) && !but)) {
 					if (Object.prototype.hasOwnProperty.call(ret, key)) {
 						const epMe = ret[key];
 						epMe.data.push({
