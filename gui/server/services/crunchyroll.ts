@@ -1,4 +1,14 @@
-import { AuthData, CheckTokenResponse, EpisodeListResponse, MessageHandler, QueueItem, ResolveItemsData, ResponseBase, SearchData, SearchResponse } from '../../../@types/messageHandler';
+import {
+	AuthData,
+	CheckTokenResponse,
+	EpisodeListResponse,
+	MessageHandler,
+	QueueItem,
+	ResolveItemsData,
+	ResponseBase,
+	SearchData,
+	SearchResponse
+} from '../../../@types/messageHandler';
 import { CrunchyEpMeta } from '../../../@types/crunchyTypes';
 import Crunchy from '../../../crunchy';
 import { getDefault } from '../../../modules/module.args';
@@ -138,7 +148,8 @@ class CrunchyHandler extends Base implements MessageHandler {
 		console.debug(`Got download options: ${JSON.stringify(data)}`);
 		this.setDownloading(true);
 		const _default = yargs.appArgv(this.crunchy.cfg.cli, true);
-		const res = await this.resolveForDownload(data);		let failed = false;
+		const res = await this.resolveForDownload(data);
+		let failed = false;
 		let failureError: Error | undefined;
 		if (res.isOk) {
 			for (const select of res.value) {
