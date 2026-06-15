@@ -46,7 +46,26 @@ export default class Base {
 	}
 
 	alertError(error: Error) {
-		console.error(`${error}`);
+		console.error(`${error.name}: ${error.message}`);
+	}
+
+	/** Re-queue a failed item at the front and pause batch processing. */
+	protected handleItemFailure(item: QueueItem, error: Error) {
+		this.alertError(error);
+		this.queue.unshift(item);
+		if (this.workOnQueue) {
+			this.workOnQueue = false;
+			this.sendMessage({
+				name: 'downloadQueueState',
+				data: {
+					running: false,
+					reason: 'Download failed — queue paused. Fix the issue, then press Start Queue to retry.'
+				}
+			});
+		}
+		this.state.services[this.name].queue = this.queue;
+		setState(this.state);
+		this.sendMessage({ name: 'queueChange', data: this.queue });
 	}
 
 	makeProgressHandler(videoInfo: DownloadInfo) {
@@ -115,6 +134,7 @@ export default class Base {
 
 	public setDownloadQueue(data: boolean) {
 		this.workOnQueue = data;
+		this.sendMessage({ name: 'downloadQueueState', data: { running: data } });
 		this.queueChange();
 	}
 

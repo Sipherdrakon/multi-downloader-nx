@@ -1,4 +1,5 @@
-import { AuthData, CheckTokenResponse, EpisodeListResponse, MessageHandler, QueueItem, ResolveItemsData, SearchData, SearchResponse } from '../../../@types/messageHandler';
+import { AuthData, CheckTokenResponse, EpisodeListResponse, MessageHandler, QueueItem, ResolveItemsData, ResponseBase, SearchData, SearchResponse } from '../../../@types/messageHandler';
+import { CrunchyEpMeta } from '../../../@types/crunchyTypes';
 import Crunchy from '../../../crunchy';
 import { getDefault } from '../../../modules/module.args';
 import { languages, subtitleLanguagesFilter } from '../../../modules/module.langsData';
@@ -101,16 +102,44 @@ class CrunchyHandler extends Base implements MessageHandler {
 		return this.crunchy.doAuth(data);
 	}
 
+	/** Resolve queue item metadata for download — uses stored media IDs when available. */
+	private async resolveForDownload(data: QueueItem): Promise<ResponseBase<CrunchyEpMeta[]>> {
+		if (data.ids?.length) {
+			const selected = await this.crunchy.getObjectById(data.ids.join(','));
+			if (Array.isArray(selected) && selected.length > 0) {
+				const seasonNum = parseInt(data.parent.season, 10);
+				const value = selected.map((item) => ({
+					...item,
+					seriesTitle: item.seriesTitle ?? data.parent.title,
+					seasonTitle: item.seasonTitle ?? data.parent.title,
+					episodeTitle: item.episodeTitle ?? data.title,
+					episodeNumber: item.episodeNumber ?? data.episode,
+					e: item.e ?? data.e,
+					showID: item.showID ?? data.id,
+					seasonID: item.seasonID ?? data.id,
+					season: item.season ?? (Number.isNaN(seasonNum) ? 0 : seasonNum),
+					image: item.image ?? data.image,
+					data: item.data ?? []
+				})) as CrunchyEpMeta[];
+				if (value.every((v) => v.data.some((d) => d.playback))) {
+					return { isOk: true, value };
+				}
+			}
+		}
+		return this.crunchy.downloadFromSeriesID(data.id, {
+			dubLang: data.dubLang,
+			e: data.e
+		});
+	}
+
 	public async downloadItem(data: QueueItem) {
 		this.getDefaults();
 		await this.crunchy.refreshToken(true);
 		console.debug(`Got download options: ${JSON.stringify(data)}`);
 		this.setDownloading(true);
 		const _default = yargs.appArgv(this.crunchy.cfg.cli, true);
-		const res = await this.crunchy.downloadFromSeriesID(data.id, {
-			dubLang: data.dubLang,
-			e: data.e
-		});
+		const res = await this.resolveForDownload(data);		let failed = false;
+		let failureError: Error | undefined;
 		if (res.isOk) {
 			for (const select of res.value) {
 				if (
@@ -129,13 +158,18 @@ class CrunchyHandler extends Base implements MessageHandler {
 						all: data.all
 					}))
 				) {
-					const er = new Error(`Unable to download episode ${data.e} from ${data.id}`);
-					er.name = 'Download error';
-					this.alertError(er);
+					failed = true;
+					failureError = new Error(`Unable to download episode ${data.e} from ${data.id}`);
+					failureError.name = 'Download error';
+					break;
 				}
 			}
 		} else {
-			this.alertError(res.reason);
+			failed = true;
+			failureError = res.reason instanceof Error ? res.reason : new Error(String(res.reason));
+		}
+		if (failed && failureError) {
+			this.handleItemFailure(data, failureError);
 		}
 		this.sendMessage({ name: 'finish', data: undefined });
 		this.setDownloading(false);

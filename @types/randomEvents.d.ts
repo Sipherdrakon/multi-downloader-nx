@@ -5,6 +5,7 @@ export type RandomEvents = {
 	finish: undefined;
 	queueChange: QueueItem[];
 	current: QueueItem | undefined;
+	downloadQueueState: { running: boolean; reason?: string };
 };
 
 export interface RandomEvent<T extends keyof RandomEvents> {

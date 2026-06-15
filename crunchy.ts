@@ -599,12 +599,18 @@ export default class Crunchy implements ServiceClass {
 			/*if (ifNeeded)
         return;*/
 			if (!(Date.now() > new Date(this.token.expires).getTime()) && ifNeeded) {
-				// Even if token is valid, ensure CMS token is available
+				// Even if token is valid by expiry, verify it still works before skipping refresh
 				if (this.token.refresh_token) {
-					await this.getProfile(silent);
+					const profileOk = await this.getProfile(silent);
+					if (profileOk) {
+						await this.getCMStoken(ifNeeded);
+						return;
+					}
+					// Profile rejected the token (e.g. invalid_auth_token) — force refresh below
+				} else {
+					await this.getCMStoken(ifNeeded);
+					return;
 				}
-				await this.getCMStoken(ifNeeded);
-				return;
 			} else {
 				//console.info('[WARN] The token has expired completely. I will try to refresh the token anyway, but you might have to reauth.');
 			}

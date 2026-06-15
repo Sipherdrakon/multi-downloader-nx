@@ -155,24 +155,35 @@ class HidiveHandler extends Base implements MessageHandler {
 			novids: data.novids
 		};
 
+		let failed = false;
+		let failureError: Error | undefined;
 		const episodeId = data.ids?.[0];
 		if (episodeId != null) {
 			const result = await this.hidive.downloadSingleEpisode(Number(episodeId), downloadOpts);
 			if (!result.isOk) {
-				this.alertError(result.reason instanceof Error ? result.reason : new Error('Download failed upstream, check for additional logs'));
+				failed = true;
+				failureError = result.reason instanceof Error ? result.reason : new Error('Download failed upstream, check for additional logs');
 			}
 		} else {
 			const parsed = this.parseHidiveInput(data.id);
 			const res =
 				parsed.type === 'season' ? await this.hidive.selectSeason(parsed.id, data.e, false, false) : await this.hidive.selectSeries(parsed.id, data.e, false, false);
-			if (!res.isOk || !res.showData) return this.alertError(new Error('Download failed upstream, check for additional logs'));
-
-			for (const ep of res.value) {
-				const result = await this.hidive.downloadEpisode(ep, downloadOpts);
-				if (!result.isOk) {
-					this.alertError(result.reason instanceof Error ? result.reason : new Error('Download failed upstream, check for additional logs'));
+			if (!res.isOk || !res.showData) {
+				failed = true;
+				failureError = new Error('Download failed upstream, check for additional logs');
+			} else {
+				for (const ep of res.value) {
+					const result = await this.hidive.downloadEpisode(ep, downloadOpts);
+					if (!result.isOk) {
+						failed = true;
+						failureError = result.reason instanceof Error ? result.reason : new Error('Download failed upstream, check for additional logs');
+						break;
+					}
 				}
 			}
+		}
+		if (failed && failureError) {
+			this.handleItemFailure(data, failureError);
 		}
 		this.sendMessage({ name: 'finish', data: undefined });
 		this.setDownloading(false);

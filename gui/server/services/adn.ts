@@ -1,4 +1,4 @@
-import { AuthData, CheckTokenResponse, DownloadData, EpisodeListResponse, MessageHandler, ResolveItemsData, SearchData, SearchResponse } from '../../../@types/messageHandler';
+import { AuthData, CheckTokenResponse, EpisodeListResponse, MessageHandler, QueueItem, ResolveItemsData, SearchData, SearchResponse } from '../../../@types/messageHandler';
 import AnimationDigitalNetwork from '../../../adn';
 import { getDefault } from '../../../modules/module.args';
 import { languages } from '../../../modules/module.langsData';
@@ -111,11 +111,13 @@ class ADNHandler extends Base implements MessageHandler {
 		};
 	}
 
-	public async downloadItem(data: DownloadData) {
+	public async downloadItem(data: QueueItem) {
 		this.setDownloading(true);
 		console.debug(`Got download options: ${JSON.stringify(data)}`);
 		const _default = yargs.appArgv(this.adn.cfg.cli, true);
 		const res = await this.adn.selectShow(parseInt(data.id), data.e, false, false);
+		let failed = false;
+		let failureError: Error | undefined;
 		if (res.isOk) {
 			for (const select of res.value) {
 				if (
@@ -134,13 +136,18 @@ class ADNHandler extends Base implements MessageHandler {
 						dubLang: data.dubLang
 					}))
 				) {
-					const er = new Error(`Unable to download episode ${data.e} from ${data.id}`);
-					er.name = 'Download error';
-					this.alertError(er);
+					failed = true;
+					failureError = new Error(`Unable to download episode ${data.e} from ${data.id}`);
+					failureError.name = 'Download error';
+					break;
 				}
 			}
 		} else {
-			this.alertError(new Error('Failed to download episode, check for additional logs.'));
+			failed = true;
+			failureError = new Error('Failed to download episode, check for additional logs.');
+		}
+		if (failed && failureError) {
+			this.handleItemFailure(data, failureError);
 		}
 		this.sendMessage({ name: 'finish', data: undefined });
 		this.setDownloading(false);

@@ -122,7 +122,7 @@ class OceanveilHandler extends Base implements MessageHandler {
 			const { downloaded } = await import('../../../modules/module.downloadArchive');
 			downloaded({ service: 'oceanveil', type: 'srz' }, titleId, [episodeId]);
 		} catch (e) {
-			this.alertError(e instanceof Error ? e : new Error(String(e)));
+			this.handleItemFailure(data, e instanceof Error ? e : new Error(String(e)));
 		}
 		this.sendMessage({ name: 'finish', data: undefined });
 		this.setDownloading(false);
