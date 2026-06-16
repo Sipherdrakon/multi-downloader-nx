@@ -21,7 +21,7 @@ import { console } from './modules/log';
 import RawOutputManager from './modules/module.raw-output';
 import { downloaded } from './modules/module.downloadArchive';
 import parseSelect from './modules/module.parseSelect';
-import parseFileName, { Variable, resolveFinalMuxOutputBase } from './modules/module.filename';
+import parseFileName, { Variable, resolveFinalMuxOutputBase, resolveMediaStorageDir } from './modules/module.filename';
 import { AvailableFilenameVars } from './modules/module.args';
 import Helper from './modules/module.helper';
 
@@ -518,7 +518,25 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 		if (!this.cfg.bin.ffmpeg) this.cfg.bin = await yamlCfg.loadBinCfg();
 
 		let mediaName = '...';
-		let fileName;
+		let fileName: string | undefined;
+		let mediaDir = this.cfg.dir.tmp!;
+		const syncMediaDir = () => {
+			mediaDir = resolveMediaStorageDir({
+				novids: options.novids,
+				fileName,
+				tmpDir: this.cfg.dir.tmp!,
+				outputDirOption: options.outputDir as string | undefined,
+				cfgOutput: this.cfg.dir.output ?? this.cfg.dir.content!,
+				cfgContent: this.cfg.dir.content,
+				variables,
+				numbers: options.numbers,
+				override: options.override,
+				dubLang: options.dubLang || [],
+				dlsubs: options.dlsubs || [],
+				ccTag: options.ccTag || 'cc'
+			});
+		};
+		const relOutFile = (outFile: string) => (path.isAbsolute(outFile) ? outFile.slice(mediaDir.length) : outFile);
 		const variables: Variable[] = [];
 		if (data.show.title && data.shortNumber && data.title) {
 			mediaName = `${data.show.shortTitle ?? data.show.title} - ${data.shortNumber} - ${data.title}`;
@@ -794,6 +812,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 							options.dlsubs || [],
 							options.ccTag || 'cc'
 						).join(path.sep);
+						syncMediaDir();
 						const outFile = parseFileName(
 							options.fileName + '.' + audDub.name,
 							variables,
@@ -825,7 +844,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 							const mathParts = Math.ceil(totalParts / options.partsize);
 							const mathMsg = `(${mathParts}*${options.partsize})`;
 							console.info('Total parts in stream:', totalParts, mathMsg);
-							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
+							tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(mediaDir, outFile);
 							const dirName = path.dirname(tsFile);
 							if (!fs.existsSync(dirName)) {
 								fs.mkdirSync(dirName, { recursive: true });
@@ -840,7 +859,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 								override: options.force,
 								callback: options.callbackMaker
 									? options.callbackMaker({
-											fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.tmp!.length) : outFile}`,
+											fileName: `${relOutFile(outFile)}`,
 											image: data.image,
 											parent: {
 												title: data.show.title
@@ -871,6 +890,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 				fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(
 					path.sep
 				);
+				syncMediaDir();
 			}
 			await this.sleep(options.waittime);
 		}
@@ -906,6 +926,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 						options.dlsubs || [],
 						options.ccTag || 'cc'
 					).join(path.sep);
+					syncMediaDir();
 					const outFile = parseFileName(
 						options.fileName,
 						variables,
@@ -915,7 +936,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 						options.dlsubs || [],
 						options.ccTag || 'cc'
 					).join(path.sep);
-					const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
+					const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(mediaDir, outFile);
 					const dirName = path.dirname(tsFile);
 					if (!fs.existsSync(dirName)) {
 						fs.mkdirSync(dirName, { recursive: true });
@@ -991,7 +1012,7 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 					if (path.isAbsolute(sxData.file)) {
 						sxData.path = sxData.file;
 					} else {
-						sxData.path = path.join(this.cfg.dir.tmp!, sxData.file);
+						sxData.path = path.join(mediaDir, sxData.file);
 					}
 					const dirName = path.dirname(sxData.path);
 					if (!fs.existsSync(dirName)) {

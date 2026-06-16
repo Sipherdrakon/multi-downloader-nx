@@ -235,4 +235,41 @@ export function resolveFinalMuxOutputBase(opts: {
 	return path.join(targetDir, finalNamePart);
 }
 
+/** Temp for in-progress segments; output when novids skips mux (finished subs/audio-only). */
+export function resolveMediaStorageDir(opts: {
+	novids?: boolean;
+	fileName: string | undefined;
+	tmpDir: string;
+	outputDirOption?: string;
+	cfgOutput: string;
+	cfgContent: string;
+	variables: Variable[];
+	numbers: number;
+	override: string[];
+	dubLang: string[];
+	dlsubs: string[];
+	ccTag: string;
+}): string {
+	if (!opts.novids || !opts.fileName) {
+		return opts.tmpDir;
+	}
+	const outputBase = resolveFinalMuxOutputBase({
+		fileName: opts.fileName,
+		outputDirOption: opts.outputDirOption,
+		cfgOutput: opts.cfgOutput,
+		cfgContent: opts.cfgContent,
+		variables: opts.variables,
+		numbers: opts.numbers,
+		override: opts.override,
+		dubLang: opts.dubLang,
+		dlsubs: opts.dlsubs,
+		ccTag: opts.ccTag
+	});
+	const dir = path.dirname(outputBase);
+	if (!fs.existsSync(dir)) {
+		fs.mkdirSync(dir, { recursive: true });
+	}
+	return dir;
+}
+
 export default parseFileName;

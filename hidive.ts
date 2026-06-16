@@ -23,7 +23,7 @@ import RawOutputManager from './modules/module.raw-output';
 import { api } from './modules/module.api-urls';
 import * as reqModule from './modules/module.fetch';
 import { DownloadedMedia } from './@types/hidiveTypes';
-import parseFileName, { Variable, resolveFinalMuxOutputBase } from './modules/module.filename';
+import parseFileName, { Variable, resolveFinalMuxOutputBase, resolveMediaStorageDir } from './modules/module.filename';
 import { downloaded } from './modules/module.downloadArchive';
 import parseSelect from './modules/module.parseSelect';
 import { AvailableFilenameVars } from './modules/module.args';
@@ -1119,6 +1119,21 @@ export default class Hidive implements ServiceClass {
 		const fileName = parseFileName(options.fileName, variables, options.numbers, options.override, options.dubLang || [], options.dlsubs || [], options.ccTag || 'cc').join(
 			path.sep
 		);
+		let mediaDir = resolveMediaStorageDir({
+			novids: options.novids,
+			fileName,
+			tmpDir: this.cfg.dir.tmp!,
+			outputDirOption: options.outputDir as string | undefined,
+			cfgOutput: this.cfg.dir.output ?? this.cfg.dir.content!,
+			cfgContent: this.cfg.dir.content,
+			variables,
+			numbers: options.numbers,
+			override: options.override,
+			dubLang: options.dubLang || [],
+			dlsubs: options.dlsubs || [],
+			ccTag: options.ccTag || 'cc'
+		});
+		const relOutFile = (outFile: string) => (path.isAbsolute(outFile) ? outFile.slice(mediaDir.length) : outFile);
 
 		console.info(`Selected quality: \n\tVideo: ${chosenVideoSegments.resolutionText}\n\tAudio: ${chosenAudios[0].resolutionText}\n\tServer: ${selectedServer}`);
 		console.info(`Selected (Available) Audio Languages: ${chosenAudios.map((a) => a.language.name).join(', ')}`);
@@ -1144,7 +1159,7 @@ export default class Hidive implements ServiceClass {
 			const mathParts = Math.ceil(totalParts / options.partsize);
 			const mathMsg = `(${mathParts}*${options.partsize})`;
 			console.info('Total parts in video stream:', totalParts, mathMsg);
-			const tsFile = path.isAbsolute(fileName) ? fileName : path.join(this.cfg.dir.tmp!, fileName);
+			const tsFile = path.isAbsolute(fileName) ? fileName : path.join(mediaDir, fileName);
 			const tempFile = parseFileName(
 				`temp-${selectedEpisode.id}`,
 				variables,
@@ -1172,7 +1187,7 @@ export default class Hidive implements ServiceClass {
 				override: options.force,
 				callback: options.callbackMaker
 					? options.callbackMaker({
-							fileName: `${path.isAbsolute(fileName) ? fileName.slice(this.cfg.dir.tmp!.length) : fileName}`,
+							fileName: `${relOutFile(fileName)}`,
 							image: selectedEpisode.thumbnailUrl,
 							parent: {
 								title: selectedEpisode.seriesTitle
@@ -1265,7 +1280,7 @@ export default class Hidive implements ServiceClass {
 					options.dlsubs || [],
 					options.ccTag || 'cc'
 				).join(path.sep);
-				const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(this.cfg.dir.tmp!, outFile);
+				const tsFile = path.isAbsolute(outFile as string) ? outFile : path.join(mediaDir, outFile);
 				const dirName = path.dirname(tsFile);
 				if (!fs.existsSync(dirName)) {
 					fs.mkdirSync(dirName, { recursive: true });
@@ -1283,7 +1298,7 @@ export default class Hidive implements ServiceClass {
 					override: options.force,
 					callback: options.callbackMaker
 						? options.callbackMaker({
-								fileName: `${path.isAbsolute(outFile) ? outFile.slice(this.cfg.dir.tmp!.length) : outFile}`,
+								fileName: `${relOutFile(outFile)}`,
 								image: selectedEpisode.thumbnailUrl,
 								parent: {
 									title: selectedEpisode.seriesTitle
@@ -1372,7 +1387,7 @@ export default class Hidive implements ServiceClass {
 					if (path.isAbsolute(sxData.file)) {
 						sxData.path = sxData.file;
 					} else {
-						sxData.path = path.join(this.cfg.dir.tmp!, sxData.file);
+						sxData.path = path.join(mediaDir, sxData.file);
 					}
 					const dirName = path.dirname(sxData.path);
 					if (!fs.existsSync(dirName)) {
