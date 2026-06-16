@@ -33,6 +33,7 @@ dist/
 gui/react/build/
 docker-compose.yml
 crunchyendpoints
+extracted_credentials.txt
 .vscode
 .idea
 /logs
