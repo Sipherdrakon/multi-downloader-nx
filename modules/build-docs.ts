@@ -48,6 +48,7 @@ This tool is not responsible for your actions; please make an informed decision 
     - Several names = those services only
  - **OceanVeil** search filters: use \`--search "<term>" --tags ...\` / \`--tag-ids ...\` (tags are AND-ed by API). Example: \`--search "bl" --tags yaoi\` or \`--search "isekai" --tag-ids 59 22\`.
 - **OceanVeil** selectors: use \`--srz <titleId>\` and \`-e <episodeNumberOrId>\`; \`-s\` is optional and only season \`1\` is supported when provided (e.g. \`--srz 337 -e 4\` or \`--srz 337 -s 1 -e 2100\`).
+- **ADN / HiDive multi-season**: ADN \`-s\` is a show ID (all seasons). HiDive \`--srz\` is a series ID (all seasons). When episode numbers repeat per season, use \`-e S1E1\`, \`-e S2E3\`, or the episode API id—not bare \`-e 1\` on ADN or HiDive \`--srz\` (no match). HiDive \`-s <seasonId> -e 1\` is fine for a single season.
 `;
 
 Object.entries(groups).forEach(([key, value]) => {

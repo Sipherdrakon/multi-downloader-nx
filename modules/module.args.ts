@@ -257,7 +257,7 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		describe: 'Get season list by series ID',
 		docDescribe:
 			'Requested is the ID of a show/series (not a season).' +
-			'\n- Hidive: matches Z.<id> search results' +
+			'\n- Hidive: matches Z.<id> search results; lists all seasons. For one season only, use -s with a season ID instead.' +
 			'\n- OceanVeil: numeric title ID from search/site; use with -e for episodes. Optional -s 1 only.' +
 			'\n  Alternatively download by API episode IDs alone with -e (no --srz); see --episode.',
 		service: ['crunchy', 'hidive', 'oceanveil'],
@@ -271,8 +271,9 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		describe: 'Set the primary content ID (service-specific)',
 		docDescribe:
 			'Service-specific selector:' +
-			'\n- Crunchyroll/Hidive/ADN: usually season ID' +
-			'\n- Hidive also supports series ID via --srz' +
+			'\n- Crunchyroll/Hidive: season ID (one season per -s)' +
+			'\n- ADN: show ID from the URL (/video/<id>-...); lists every season in one list' +
+			'\n- Hidive: full series via --srz instead of -s' +
 			'\n- OceanVeil: optional season selector (only season 1 supported when provided)',
 		service: ['all'],
 		usage: '${ID}'
@@ -284,7 +285,10 @@ const args: TAppArg<boolean | number | string | unknown[]>[] = [
 		docDescribe:
 			'Set the episode(s) to download from any given show.' +
 			'\nFor multiple selection: 1-4 OR 1,2,3,4 ' +
-			'\nFor special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter' +
+			'\nFor special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter (not a season prefix).' +
+			'\nADN / Hidive multi-season: when the same episode number exists in more than one season (e.g. S1E1 and S2E1), bare -e 1 matches nothing on ADN or Hidive --srz.' +
+			' Use S1E1, S2E3, etc., or the numeric episode API id from the list output.' +
+			'\nHidive: -s <seasonId> -e 1 is unambiguous (one season). --srz <seriesId> spans all seasons.' +
 			'\nOceanVeil with --srz <title_id>: comma-separated display numbers and/or anime_episodes API IDs' +
 			' (from URL …/anime_episodes/<id> or --new).' +
 			'\nOceanVeil without --srz: comma-separated numeric API episode IDs only; requires --auth;' +

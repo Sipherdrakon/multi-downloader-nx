@@ -118,6 +118,7 @@ class CrunchyHandler extends Base implements MessageHandler {
 			const selected = await this.crunchy.getObjectById(data.ids.join(','));
 			if (Array.isArray(selected) && selected.length > 0) {
 				const seasonNum = parseInt(data.parent.season, 10);
+				const queueLang = data.dubLang?.length ? languages.find((l) => l.code === data.dubLang[0]) : undefined;
 				const value = selected.map((item) => ({
 					...item,
 					seriesTitle: item.seriesTitle ?? data.parent.title,
@@ -129,7 +130,10 @@ class CrunchyHandler extends Base implements MessageHandler {
 					seasonID: item.seasonID ?? data.id,
 					season: item.season ?? (Number.isNaN(seasonNum) ? 0 : seasonNum),
 					image: item.image ?? data.image,
-					data: item.data ?? []
+					data: (item.data ?? []).map((d) => ({
+						...d,
+						lang: d.lang ?? queueLang
+					}))
 				})) as CrunchyEpMeta[];
 				if (value.every((v) => v.data.some((d) => d.playback))) {
 					return { isOk: true, value };
@@ -161,6 +165,7 @@ class CrunchyHandler extends Base implements MessageHandler {
 						q: data.q,
 						fileName: data.fileName,
 						dlsubs: data.dlsubs,
+						dubLang: data.dubLang,
 						dlVideoOnce: data.dlVideoOnce,
 						force: 'y',
 						novids: data.novids,

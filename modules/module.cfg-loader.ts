@@ -175,6 +175,19 @@ const loadCfg = (): ConfigObject => {
 	return defaultCfg;
 };
 
+const resolveBinPath = async (binPath: string): Promise<string | undefined> => {
+	const normalized = path.normalize(binPath);
+	const resolved = await lookpath(normalized);
+	if (resolved) return resolved;
+	if (normalized.includes(path.sep) || path.isAbsolute(normalized)) {
+		const candidates = process.platform === 'win32' && !normalized.toLowerCase().endsWith('.exe') ? [normalized, `${normalized}.exe`] : [normalized];
+		for (const candidate of candidates) {
+			if (fs.existsSync(candidate)) return candidate;
+		}
+	}
+	return undefined;
+};
+
 const loadBinCfg = async () => {
 	const binCfg = loadYamlCfgFile<ConfigObject['bin']>(binCfgFile);
 	// binaries
@@ -196,8 +209,7 @@ const loadBinCfg = async () => {
 		if (!path.isAbsolute(binCfg[dir] as string)) {
 			binCfg[dir] = path.join(workingDir, binCfg[dir] as string);
 		}
-		binCfg[dir] = await lookpath(binCfg[dir] as string);
-		binCfg[dir] = binCfg[dir] ? binCfg[dir] : undefined;
+		binCfg[dir] = await resolveBinPath(binCfg[dir] as string);
 		if (!binCfg[dir]) {
 			const binFile = await lookpath(path.basename(defaultBin[dir]));
 			binCfg[dir] = binFile ? binFile : binCfg[dir];

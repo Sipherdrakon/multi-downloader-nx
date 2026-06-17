@@ -19,6 +19,7 @@ This tool is not responsible for your actions; please make an informed decision 
     - Several names = those services only
  - **OceanVeil** search filters: use `--search "<term>" --tags ...` / `--tag-ids ...` (tags are AND-ed by API). Example: `--search "bl" --tags yaoi` or `--search "isekai" --tag-ids 59 22`.
 - **OceanVeil** selectors: use `--srz <titleId>` and `-e <episodeNumberOrId>`; `-s` is optional and only season `1` is supported when provided (e.g. `--srz 337 -e 4` or `--srz 337 -s 1 -e 2100`).
+- **ADN / HiDive multi-season**: ADN `-s` is a show ID (all seasons). HiDive `--srz` is a series ID (all seasons). When episode numbers repeat per season, use `-e S1E1`, `-e S2E3`, or the episode API id—not bare `-e 1` on ADN or HiDive `--srz` (no match). HiDive `-s <seasonId> -e 1` is fine for a single season.
 
 ### Authentication
 #### `--auth`
@@ -189,7 +190,7 @@ Get Raw Show list data
 | Crunchyroll, Hidive, OceanVeil | `--series ${ID}` | `string` | `No`| `--srz` | `NaN` |
 
 Requested is the ID of a show/series (not a season).
-- Hidive: matches Z.<id> search results
+- Hidive: matches Z.<id> search results; lists all seasons. For one season only, use -s with a season ID instead.
 - OceanVeil: numeric title ID from search/site; use with -e for episodes. Optional -s 1 only.
   Alternatively download by API episode IDs alone with -e (no --srz); see --episode.
 #### `-s`
@@ -198,8 +199,9 @@ Requested is the ID of a show/series (not a season).
 | All | `-s ${ID}` | `string` | `No`| `NaN` | `NaN` |
 
 Service-specific selector:
-- Crunchyroll/Hidive/ADN: usually season ID
-- Hidive also supports series ID via --srz
+- Crunchyroll/Hidive: season ID (one season per -s)
+- ADN: show ID from the URL (/video/<id>-...); lists every season in one list
+- Hidive: full series via --srz instead of -s
 - OceanVeil: optional season selector (only season 1 supported when provided)
 #### `-e`
 | **Service** | **Usage** | **Type** | **Required** | **Alias** |  **cli-default Entry**
@@ -208,7 +210,9 @@ Service-specific selector:
 
 Set the episode(s) to download from any given show.
 For multiple selection: 1-4 OR 1,2,3,4 
-For special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter
+For special episodes: S1-4 OR S1,S2,S3,S4 where S is the special letter (not a season prefix).
+ADN / Hidive multi-season: when the same episode number exists in more than one season (e.g. S1E1 and S2E1), bare -e 1 matches nothing on ADN or Hidive --srz. Use S1E1, S2E3, etc., or the numeric episode API id from the list output.
+Hidive: -s <seasonId> -e 1 is unambiguous (one season). --srz <seriesId> spans all seasons.
 OceanVeil with --srz <title_id>: comma-separated display numbers and/or anime_episodes API IDs (from URL …/anime_episodes/<id> or --new).
 OceanVeil without --srz: comma-separated numeric API episode IDs only; requires --auth; resolves each ID via the API (official mode, not a bug).
 OceanVeil: range syntax (1-4) is not parsed here; use commas.

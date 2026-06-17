@@ -82,7 +82,7 @@ class HidiveHandler extends Base implements MessageHandler {
 						season: item.episodeInformation.seasonNumber + ''
 					},
 					image: item.thumbnailUrl,
-					e: item.episodeInformation.episodeNumber + '',
+					e: item.id + '',
 					episode: item.episodeInformation.episodeNumber + ''
 				};
 			})

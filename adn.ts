@@ -20,7 +20,7 @@ import streamdl from './modules/hls-download';
 import { console } from './modules/log';
 import RawOutputManager from './modules/module.raw-output';
 import { downloaded } from './modules/module.downloadArchive';
-import parseSelect from './modules/module.parseSelect';
+import parseSelect, { episodeSelectionKeys, hasDuplicateEpisodeNumbers } from './modules/module.parseSelect';
 import parseFileName, { Variable, resolveFinalMuxOutputBase, resolveMediaStorageDir } from './modules/module.filename';
 import { AvailableFilenameVars } from './modules/module.args';
 import Helper from './modules/module.helper';
@@ -330,8 +330,6 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 			} else {
 				episode.season = '1';
 			}
-			show.value.videos[episodeIndex].season = episode.season;
-			show.value.videos[episodeIndex].shortNumber = episodeIndex + '';
 			if (!episodeNumber) {
 				specialIndex++;
 				episode.shortNumber = 'S' + specialIndex;
@@ -405,10 +403,17 @@ export default class AnimationDigitalNetwork implements ServiceClass {
 		console.info('-'.repeat(30));
 		console.info('');
 		const showData = getShowData.value;
+		const hasDuplicateEpNumbers = hasDuplicateEpisodeNumbers(showData.videos.map((v) => v.shortNumber));
 		const doEpsFilter = parseSelect(e as string);
 		const selEpsArr: ADNVideo[] = [];
 		for (const episode of showData.videos) {
-			if (all || (but && !doEpsFilter.isSelected([episode.shortNumber, episode.id + ''])) || (!but && doEpsFilter.isSelected([episode.shortNumber, episode.id + '']))) {
+			const keys = episodeSelectionKeys({
+				id: episode.id,
+				season: episode.season,
+				episodeNumber: episode.shortNumber,
+				hasDuplicateEpNumbers
+			});
+			if (all || (but && !doEpsFilter.isSelected(keys)) || (!but && doEpsFilter.isSelected(keys))) {
 				selEpsArr.push({ isSelected: true, ...episode });
 				console.info('%s[S%sE%s] %s', '✓ ', episode.season, episode.shortNumber, episode.name);
 			}

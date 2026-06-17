@@ -25,7 +25,7 @@ import * as reqModule from './modules/module.fetch';
 import { DownloadedMedia } from './@types/hidiveTypes';
 import parseFileName, { Variable, resolveFinalMuxOutputBase, resolveMediaStorageDir } from './modules/module.filename';
 import { downloaded } from './modules/module.downloadArchive';
-import parseSelect from './modules/module.parseSelect';
+import parseSelect, { episodeSelectionKeys, hasDuplicateEpisodeNumbers } from './modules/module.parseSelect';
 import { AvailableFilenameVars } from './modules/module.args';
 import { AuthData, AuthResponse, SearchData, SearchResponse, SearchResponseItem } from './@types/messageHandler';
 import { ServiceClass } from './@types/serviceClassInterface';
@@ -806,6 +806,7 @@ export default class Hidive implements ServiceClass {
 			return { isOk: false, value: [] };
 		}
 		const showData = getShowData.value;
+		const hasDuplicateEpNumbers = hasDuplicateEpisodeNumbers(showData.map((v) => String(v.episodeInformation.episodeNumber)));
 		const doEpsFilter = parseSelect(e as string);
 		// build selected episodes
 		const selEpsArr: NewHidiveEpisodeExtra[] = [];
@@ -823,12 +824,14 @@ export default class Hidive implements ServiceClass {
 				nameLong = 'movie' + ('0' + movieSeq).slice(-2);
 				movieSeq++;
 			}
+			const keys = episodeSelectionKeys({
+				id: showData[i].id,
+				season: showData[i].episodeInformation.seasonNumber,
+				episodeNumber: showData[i].episodeInformation.episodeNumber,
+				hasDuplicateEpNumbers
+			});
 			let selMark = '';
-			if (
-				all ||
-				(but && !doEpsFilter.isSelected([parseFloat(showData[i].episodeInformation.episodeNumber + '') + '', showData[i].id + ''])) ||
-				(!but && doEpsFilter.isSelected([parseFloat(showData[i].episodeInformation.episodeNumber + '') + '', showData[i].id + '']))
-			) {
+			if (all || (but && !doEpsFilter.isSelected(keys)) || (!but && doEpsFilter.isSelected(keys))) {
 				selEpsArr.push({ isSelected: true, titleId, nameLong, seasonTitle, seriesTitle, ...showData[i] });
 				selMark = '✓ ';
 			}

@@ -20,13 +20,13 @@ const EpisodeListing: React.FC = () => {
 		return s;
 	}, [store.episodeListing]);
 
-	// Use episode ID for selection only on Hidive when same episode number appears in different seasons (e.g. S1E6 vs S2E6)
+	// Use episode ID when the same episode number appears in different seasons (e.g. S1E6 vs S2E6)
 	const useIdForSelection = React.useMemo(() => {
 		const epNumbers = store.episodeListing.map((ep) => ep.e);
 		return epNumbers.length > 0 && epNumbers.length !== new Set(epNumbers).size;
 	}, [store.episodeListing]);
 	const multiSeason = seasons.length > 1 || useIdForSelection;
-	const useIdForKey = multiSeason && store.service === 'hidive';
+	const useIdForKey = multiSeason && (store.service === 'hidive' || store.service === 'adn');
 	const [selected, setSelected] = React.useState<string[]>([]);
 
 	React.useEffect(() => {

@@ -52,6 +52,11 @@ const parseSelect = (
 				}
 			}
 		} else {
+			const sxExMatch = part.match(/^S(\d+)E(\d+)$/i);
+			if (sxExMatch) {
+				select.push(`S${parseInt(sxExMatch[1], 10)}E${parseInt(sxExMatch[2], 10)}`);
+				return;
+			}
 			if (part.match(/[0-9A-Z]{9}/)) {
 				select.push(part);
 				return;
@@ -83,6 +88,12 @@ const parseSelect = (
 		isSelected: (st) => {
 			if (typeof st === 'string') st = [st];
 			return st.some((st) => {
+				const sxExMatch = st.match(/^S(\d+)E(\d+)$/i);
+				if (sxExMatch) {
+					const normalized = `S${parseInt(sxExMatch[1], 10)}E${parseInt(sxExMatch[2], 10)}`;
+					const included = select.includes(normalized);
+					return but ? !included : included;
+				}
 				const match = st.match(/[A-Za-z]+/);
 				if (st.match(/[0-9A-Z]{9}/)) {
 					const included = select.includes(st);
@@ -105,6 +116,17 @@ const parseSelect = (
 			});
 		}
 	};
+};
+
+export const hasDuplicateEpisodeNumbers = (episodeNumbers: string[]): boolean => episodeNumbers.length > 0 && episodeNumbers.length !== new Set(episodeNumbers).size;
+
+export const episodeSelectionKeys = (opts: { id: string | number; season: string | number; episodeNumber: string | number; hasDuplicateEpNumbers: boolean }): string[] => {
+	const ep = String(opts.episodeNumber);
+	const keys = [String(opts.id), `S${parseInt(String(opts.season), 10)}E${parseInt(ep, 10)}`];
+	if (!opts.hasDuplicateEpNumbers) {
+		keys.unshift(ep);
+	}
+	return keys;
 };
 
 export default parseSelect;

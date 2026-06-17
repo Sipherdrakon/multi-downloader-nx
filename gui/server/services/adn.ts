@@ -76,7 +76,7 @@ class ADNHandler extends Base implements MessageHandler {
 						title: a.show.shortTitle,
 						season: a.season
 					},
-					e: a.shortNumber,
+					e: a.id + '',
 					image: a.image,
 					episode: a.shortNumber
 				};
