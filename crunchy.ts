@@ -1450,6 +1450,9 @@ export default class Crunchy implements ServiceClass {
 		const res = await this.downloadMediaList(data, options);
 		if (res === undefined || res.error) {
 			return false;
+		}
+		if (!options.novids && !res.data.some((a) => a.type === 'Video')) {
+			return false;
 		} else {
 			if (!options.skipmux) {
 				await this.muxStreams(res.data, { ...options, output: res.fileName });
@@ -1865,6 +1868,49 @@ export default class Crunchy implements ServiceClass {
 		}
 	}
 
+	/** Pick the first episode version matching preferred lang, then any requested dubLang (OR). */
+	private pickEpisodeVersion(
+		versions: NonNullable<CrunchyEpMeta['data'][number]['versions']>,
+		opts: { lang?: langsData.LanguageItem; dubLang?: string[] }
+	): (typeof versions)[number] | undefined {
+		const triedLocales = new Set<string>();
+		const tryLang = (lang?: langsData.LanguageItem) => {
+			if (!lang?.cr_locale || triedLocales.has(lang.cr_locale)) return undefined;
+			triedLocales.add(lang.cr_locale);
+			const version = versions.find((a) => a.audio_locale === lang.cr_locale);
+			return version?.media_guid ? version : undefined;
+		};
+		let version = tryLang(opts.lang);
+		if (version) return version;
+		for (const code of opts.dubLang ?? []) {
+			version = tryLang(langsData.languages.find((a) => a.code === code));
+			if (version) return version;
+		}
+		if (versions.length === 1 && versions[0]?.media_guid) return versions[0];
+		return undefined;
+	}
+
+	/** Expand media entries so each available requested dub gets its own download (OR across dubLang). */
+	public expandMediaDataByDubLang(data: CrunchyEpMeta['data'], dubLang: string[]): CrunchyEpMeta['data'] {
+		if (!dubLang?.length) return data;
+		const result: CrunchyEpMeta['data'] = [];
+		for (const d of data) {
+			if (d.lang || !d.versions?.length) {
+				result.push(d);
+				continue;
+			}
+			const matched: CrunchyEpMeta['data'] = [];
+			for (const code of dubLang) {
+				const lang = langsData.languages.find((l) => l.code === code);
+				if (!lang) continue;
+				const version = d.versions.find((v) => v.audio_locale === lang.cr_locale && v.media_guid);
+				if (version) matched.push({ ...d, lang });
+			}
+			result.push(...(matched.length > 0 ? matched : [d]));
+		}
+		return result;
+	}
+
 	public async downloadMediaList(
 		medias: CrunchyEpMeta,
 		options: CrunchyDownloadOptions
@@ -1943,16 +1989,13 @@ export default class Crunchy implements ServiceClass {
 			//Get Media GUID
 			let mediaId = mMeta.mediaId;
 			if (mMeta.versions) {
-				if (mMeta.lang) {
-					currentVersion = mMeta.versions.find((a) => a.audio_locale == mMeta.lang?.cr_locale);
-				} else if (options.dubLang.length == 1) {
-					const currentLang = langsData.languages.find((a) => a.code == options.dubLang[0]);
-					currentVersion = mMeta.versions.find((a) => a.audio_locale == currentLang?.cr_locale);
-				} else if (mMeta.versions.length == 1) {
-					currentVersion = mMeta.versions[0];
-				}
+				currentVersion = this.pickEpisodeVersion(mMeta.versions, {
+					lang: mMeta.lang,
+					dubLang: options.dubLang
+				});
 				if (!currentVersion?.media_guid) {
 					console.error('Selected language not found in versions.');
+					dlFailed = true;
 					continue;
 				}
 				isPrimary = currentVersion.original;
