@@ -80,7 +80,8 @@ class CrunchyHandler extends Base implements MessageHandler {
 					},
 					e: a.e,
 					image: a.image,
-					episode: a.episodeNumber
+					episode: a.episodeNumber,
+					resolvedMeta: a
 				};
 			})
 		);
@@ -112,25 +113,35 @@ class CrunchyHandler extends Base implements MessageHandler {
 		return this.crunchy.doAuth(data);
 	}
 
-	/** Resolve queue item metadata for download — uses stored media IDs when available. */
+	/** Resolve queue item metadata for download — uses cached resolve metadata when available. */
 	private async resolveForDownload(data: QueueItem): Promise<ResponseBase<CrunchyEpMeta[]>> {
+		const seasonNum = parseInt(data.parent.season, 10);
+		const mapResolved = (item: CrunchyEpMeta): CrunchyEpMeta =>
+			({
+				...item,
+				seriesTitle: item.seriesTitle ?? data.parent.title,
+				seasonTitle: item.seasonTitle ?? data.parent.title,
+				episodeTitle: item.episodeTitle ?? data.title,
+				episodeNumber: item.episodeNumber ?? data.episode,
+				e: item.e ?? data.e,
+				showID: item.showID ?? data.id,
+				seasonID: item.seasonID ?? data.id,
+				season: item.season ?? (Number.isNaN(seasonNum) ? 0 : seasonNum),
+				image: item.image ?? data.image,
+				data: this.crunchy.expandMediaDataByDubLang(item.data ?? [], data.dubLang ?? [])
+			}) as CrunchyEpMeta;
+
+		if (data.resolvedMeta) {
+			const value = [mapResolved(data.resolvedMeta)];
+			if (value.every((v) => v.data.some((d) => d.playback))) {
+				return { isOk: true, value };
+			}
+		}
+
 		if (data.ids?.length) {
 			const selected = await this.crunchy.getObjectById(data.ids.join(','));
 			if (Array.isArray(selected) && selected.length > 0) {
-				const seasonNum = parseInt(data.parent.season, 10);
-				const value = selected.map((item) => ({
-					...item,
-					seriesTitle: item.seriesTitle ?? data.parent.title,
-					seasonTitle: item.seasonTitle ?? data.parent.title,
-					episodeTitle: item.episodeTitle ?? data.title,
-					episodeNumber: item.episodeNumber ?? data.episode,
-					e: item.e ?? data.e,
-					showID: item.showID ?? data.id,
-					seasonID: item.seasonID ?? data.id,
-					season: item.season ?? (Number.isNaN(seasonNum) ? 0 : seasonNum),
-					image: item.image ?? data.image,
-					data: this.crunchy.expandMediaDataByDubLang(item.data ?? [], data.dubLang ?? [])
-				})) as CrunchyEpMeta[];
+				const value = selected.map((item) => mapResolved(item as CrunchyEpMeta));
 				if (value.every((v) => v.data.some((d) => d.playback))) {
 					return { isOk: true, value };
 				}
@@ -144,7 +155,6 @@ class CrunchyHandler extends Base implements MessageHandler {
 
 	public async downloadItem(data: QueueItem) {
 		this.getDefaults();
-		await this.crunchy.refreshToken(true);
 		console.debug(`Got download options: ${JSON.stringify(data)}`);
 		this.setDownloading(true);
 		const _default = yargs.appArgv(this.crunchy.cfg.cli, true);

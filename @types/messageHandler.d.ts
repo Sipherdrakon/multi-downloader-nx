@@ -1,4 +1,5 @@
 import { HLSCallback } from 'hls-download';
+import type { CrunchyEpMeta } from './crunchyTypes';
 import type { FunimationSearch } from './funiSearch';
 import type { AvailableMuxer } from '../modules/module.args';
 import { LanguageItem } from '../modules/module.langsData';
@@ -43,6 +44,8 @@ export type QueueItem = {
 	image: string;
 	/** Episode/show IDs for download (string e.g. OceanVeil, number e.g. Hidive/ADN) */
 	ids?: (string | number)[];
+	/** Episode metadata from resolve — skips a CMS objects lookup on download */
+	resolvedMeta?: CrunchyEpMeta;
 } & ResolveItemsData;
 
 export type ResolveItemsData = {

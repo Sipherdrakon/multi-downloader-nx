@@ -1911,6 +1911,111 @@ export default class Crunchy implements ServiceClass {
 		return result;
 	}
 
+	private async resolveEpisodeDurationSec(episodeId: string, durationMs: number, AuthHeaders: FetchParams): Promise<number> {
+		if (durationMs > 0) return Math.floor(durationMs / 1000 - 3);
+		const epiMeta = await this.req.getData(`${api.content_cms}/objects/${episodeId}?force_locale=&preferred_audio_language=ja-JP&locale=${this.locale}`, AuthHeaders);
+		if (!epiMeta.ok || !epiMeta.res) return 7200;
+		return Math.floor((await epiMeta.res.json()).data[0].episode_metadata.duration_ms / 1000 - 3);
+	}
+
+	private async buildEpisodeChapters(episodeId: string, durationMs: number, AuthHeaders: FetchParams): Promise<string[]> {
+		const compiledChapters: string[] = [];
+		const chapterRequest = await this.req.getData(`https://static.crunchyroll.com/skip-events/production/${episodeId}.json`, {
+			headers: api.crunchyDefHeader
+		});
+		if (!chapterRequest.ok || !chapterRequest.res) {
+			console.warn('Chapter request failed, attempting old API');
+			const oldChapterRequest = await this.req.getData(`https://static.crunchyroll.com/datalab-intro-v2/${episodeId}.json`, {
+				headers: api.crunchyDefHeader
+			});
+			if (!oldChapterRequest.ok || !oldChapterRequest.res) {
+				console.warn('Old Chapter API request failed');
+				return compiledChapters;
+			}
+			console.info('Old Chapter request successful');
+			const chapterData = (await oldChapterRequest.res.json()) as CrunchyOldChapter;
+			const startTime = new Date(0),
+				endTime = new Date(0);
+			startTime.setSeconds(chapterData.startTime);
+			endTime.setSeconds(chapterData.endTime);
+			const startTimeMS = String(chapterData.startTime).split('.')[1],
+				endTimeMS = String(chapterData.endTime).split('.')[1];
+			const startMS = startTimeMS ? startTimeMS : '00',
+				endMS = endTimeMS ? endTimeMS : '00';
+			const startFormatted = startTime.toISOString().substring(11, 19) + '.' + startMS;
+			const endFormatted = endTime.toISOString().substring(11, 19) + '.' + endMS;
+			if (chapterData.startTime > 1) {
+				compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=00:00:00.00`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Prologue`);
+			}
+			compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${startFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Intro`);
+			compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${endFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
+			return compiledChapters;
+		}
+
+		console.info('Chapter request successful');
+		const chapterData = (await chapterRequest.res.json()) as CrunchyChapters;
+		const chapters: CrunchyChapter[] = [];
+		for (const chapter in chapterData) {
+			if (chapterData[chapter] && typeof chapterData[chapter] == 'object') {
+				chapters.push(chapterData[chapter]);
+			}
+		}
+		const validChapters = chapters.filter((chapter) => chapter != null);
+		if (validChapters.length === 0) return compiledChapters;
+
+		validChapters.sort((a, b) => a.start - b.start);
+		if (!validChapters.find((c) => c.type === 'intro')) {
+			compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=00:00:00.00`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
+		}
+
+		const epDuration = await this.resolveEpisodeDurationSec(episodeId, durationMs, AuthHeaders);
+		const maxStart = Math.max(...validChapters.map((obj) => obj.start).filter((start): start is number => start !== null && start !== undefined));
+
+		for (const chapter of validChapters) {
+			if (typeof chapter.start == 'undefined' || typeof chapter.end == 'undefined') continue;
+			const startTime = new Date(0),
+				endTime = new Date(0);
+			startTime.setSeconds(chapter.start);
+			endTime.setSeconds(chapter.end);
+			const startFormatted = startTime.toISOString().substring(11, 19) + '.00';
+			const endFormatted = endTime.toISOString().substring(11, 19) + '.00';
+
+			if (chapter.type == 'intro') {
+				if (chapter.start > 0) {
+					compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=00:00:00.00`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
+				}
+				compiledChapters.push(
+					`CHAPTER${compiledChapters.length / 2 + 1}=${startFormatted}`,
+					`CHAPTER${compiledChapters.length / 2 + 1}NAME=${chapter.type.charAt(0).toUpperCase() + chapter.type.slice(1)}`
+				);
+				if (chapter.end < epDuration && chapter.end != maxStart) {
+					compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${endFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
+				}
+			} else if (chapter.type !== 'recap') {
+				compiledChapters.push(
+					`CHAPTER${compiledChapters.length / 2 + 1}=${startFormatted}`,
+					`CHAPTER${compiledChapters.length / 2 + 1}NAME=${chapter.type.charAt(0).toUpperCase() + chapter.type.slice(1)}`
+				);
+				if (chapter.end < epDuration && chapter.end != maxStart) {
+					compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${endFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
+				}
+			}
+		}
+		return compiledChapters;
+	}
+
+	private async runTotalSessionDeath(AuthHeaders: FetchParams): Promise<void> {
+		console.warn('Total Session Death Active');
+		const activeStreamsReq = await this.req.getData(api.streaming_sessions, AuthHeaders);
+		if (activeStreamsReq.ok && activeStreamsReq.res) {
+			const data = await activeStreamsReq.res.json();
+			for (const s of data.items) {
+				await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${s.contentId}/${s.token}`, { ...{ method: 'DELETE' }, ...AuthHeaders });
+			}
+			console.warn(`Killed ${data.items?.length ?? 0} Sessions`);
+		}
+	}
+
 	public async downloadMediaList(
 		medias: CrunchyEpMeta,
 		options: CrunchyDownloadOptions
@@ -1969,22 +2074,65 @@ export default class Crunchy implements ServiceClass {
 			medias.data = Helper.reorderForFirstDubVideo(medias.data, (d) => d.lang?.code, options.dubLang[0]);
 		}
 
+		await this.refreshToken(true, true);
+		const AuthHeaders: FetchParams = {
+			headers: {
+				Authorization: `Bearer ${this.token.access_token}`,
+				...api.crunchyDefHeader
+			}
+		};
+
+		const firstMedia = medias.data[0];
+		const episodeMediaId = firstMedia.mediaId.includes(':') ? firstMedia.mediaId.split(':')[1] : firstMedia.mediaId;
+		const sharedChapters = options.chapters ? await this.buildEpisodeChapters(episodeMediaId, firstMedia.durationMs ?? 0, AuthHeaders) : [];
+
+		let isDLVideoBypass: boolean = options.vstream === 'android' || options.vstream === 'androidtab';
+		let isDLAudioBypass: boolean = options.astream === 'android' || options.astream === 'androidtab';
+		if (isDLVideoBypass || isDLAudioBypass) {
+			let isDLBypassCapable = true;
+			const me = await this.req.getData(api.me, AuthHeaders);
+			if (me.ok && me.res) {
+				const data_me = await me.res.json();
+				const benefits = await this.req.getData(`https://beta-api.crunchyroll.com/subs/v1/subscriptions/${data_me.external_id}/benefits`, AuthHeaders);
+				if (benefits.ok && benefits.res) {
+					const data_benefits = (await benefits.res.json()) as { items: { benefit: string }[] };
+					if (data_benefits?.items && !data_benefits.items.find((i) => i.benefit === 'offline_viewing')) {
+						isDLBypassCapable = false;
+					}
+				} else {
+					isDLBypassCapable = false;
+				}
+			} else {
+				isDLBypassCapable = false;
+			}
+			if (isDLVideoBypass && !isDLBypassCapable) {
+				isDLVideoBypass = false;
+				options.vstream = 'androidtv';
+				console.warn(
+					'VBR video downloads are not available on your current Crunchyroll plan. Please upgrade to the "Mega Fan" plan to enable this feature. Falling back to CBR video stream.'
+				);
+			}
+			if (isDLAudioBypass && !isDLBypassCapable) {
+				isDLAudioBypass = false;
+				options.astream = 'androidtv';
+				console.warn(
+					'192 kb/s audio downloads are not available on your current Crunchyroll plan. Please upgrade to the "Mega Fan" plan to enable this feature. Falling back to 128 kb/s CBR stream.'
+				);
+			}
+		}
+
+		if (options.tsd) {
+			await this.runTotalSessionDeath(AuthHeaders);
+		}
+
 		for (const mMeta of medias.data) {
 			console.info(`Requesting: [${mMeta.mediaId}] ${mediaName}`);
 
 			// Make sure we have a media id without a : in it
 			const currentMediaId = mMeta.mediaId.includes(':') ? mMeta.mediaId.split(':')[1] : mMeta.mediaId;
 
-			//Make sure token is up-to-date
-			await this.refreshToken(true, true);
 			let currentVersion;
 			let isPrimary = mMeta.isSubbed;
-			const AuthHeaders: FetchParams = {
-				headers: {
-					Authorization: `Bearer ${this.token.access_token}`,
-					...api.crunchyDefHeader
-				}
-			};
 
 			//Get Media GUID
 			let mediaId = mMeta.mediaId;
@@ -2005,179 +2153,21 @@ export default class Crunchy implements ServiceClass {
 			// If for whatever reason mediaId has a :, return the ID only
 			if (mediaId.includes(':')) mediaId = mediaId.split(':')[1];
 
-			const compiledChapters: string[] = [];
-			if (options.chapters) {
-				//Make Chapter Request
-				const chapterRequest = await this.req.getData(`https://static.crunchyroll.com/skip-events/production/${currentMediaId}.json`, {
-					headers: api.crunchyDefHeader
-				});
-				if (!chapterRequest.ok || !chapterRequest.res) {
-					//Old Chapter Request Fallback
-					console.warn('Chapter request failed, attempting old API');
-					const oldChapterRequest = await this.req.getData(`https://static.crunchyroll.com/datalab-intro-v2/${currentMediaId}.json`, {
-						headers: api.crunchyDefHeader
-					});
-					if (!oldChapterRequest.ok || !oldChapterRequest.res) {
-						console.warn('Old Chapter API request failed');
-					} else {
-						console.info('Old Chapter request successful');
-						const chapterData = (await oldChapterRequest.res.json()) as CrunchyOldChapter;
-
-						//Generate Timestamps
-						const startTime = new Date(0),
-							endTime = new Date(0);
-						startTime.setSeconds(chapterData.startTime);
-						endTime.setSeconds(chapterData.endTime);
-						const startTimeMS = String(chapterData.startTime).split('.')[1],
-							endTimeMS = String(chapterData.endTime).split('.')[1];
-						const startMS = startTimeMS ? startTimeMS : '00',
-							endMS = endTimeMS ? endTimeMS : '00';
-						const startFormatted = startTime.toISOString().substring(11, 19) + '.' + startMS;
-						const endFormatted = endTime.toISOString().substring(11, 19) + '.' + endMS;
-
-						//Push Generated Chapters
-						if (chapterData.startTime > 1) {
-							compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=00:00:00.00`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Prologue`);
-						}
-						compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${startFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Intro`);
-						compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${endFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
-					}
-				} else {
-					//Chapter request succeeded, now let's parse them
-					console.info('Chapter request successful');
-					const chapterData = (await chapterRequest.res.json()) as CrunchyChapters;
-					const chapters: CrunchyChapter[] = [];
-
-					//Make a format more usable for the crunchy chapters
-					for (const chapter in chapterData) {
-						if (chapterData[chapter] && typeof chapterData[chapter] == 'object') {
-							chapters.push(chapterData[chapter]);
-						}
-					}
-
-					// Filter out null chapters
-					const validChapters = chapters.filter((chapter) => chapter != null);
-
-					if (validChapters.length > 0) {
-						validChapters.sort((a, b) => a.start - b.start);
-						//Check if chapters has an intro
-						//if (!(chapters.find(c => c.type === 'intro') || chapters.find(c => c.type === 'recap'))) {
-						if (!validChapters.find((c) => c.type === 'intro')) {
-							compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=00:00:00.00`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
-						}
-
-						//Loop through all the chapters
-						for (const chapter of validChapters) {
-							if (typeof chapter.start == 'undefined' || typeof chapter.end == 'undefined') continue;
-							//Generate timestamps
-							const startTime = new Date(0),
-								endTime = new Date(0);
-							startTime.setSeconds(chapter.start);
-							endTime.setSeconds(chapter.end);
-							const startFormatted = startTime.toISOString().substring(11, 19) + '.00';
-							const endFormatted = endTime.toISOString().substring(11, 19) + '.00';
-							//Find the max start time from the chapters
-							const maxStart = Math.max(...validChapters.map((obj) => obj.start).filter((start): start is number => start !== null && start !== undefined));
-							//We need the duration of the ep
-							let epDuration: number | undefined;
-							const epiMeta = await this.req.getData(
-								`${api.content_cms}/objects/${currentMediaId}?force_locale=&preferred_audio_language=ja-JP&locale=${this.locale}`,
-								AuthHeaders
-							);
-							if (!epiMeta.ok || !epiMeta.res) {
-								epDuration = 7200;
-							} else {
-								epDuration = Math.floor((await epiMeta.res.json()).data[0].episode_metadata.duration_ms / 1000 - 3);
-							}
-
-							//Push generated chapters
-							if (chapter.type == 'intro') {
-								if (chapter.start > 0) {
-									compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=00:00:00.00`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
-								}
-								compiledChapters.push(
-									`CHAPTER${compiledChapters.length / 2 + 1}=${startFormatted}`,
-									`CHAPTER${compiledChapters.length / 2 + 1}NAME=${chapter.type.charAt(0).toUpperCase() + chapter.type.slice(1)}`
-								);
-								if (chapter.end < epDuration && chapter.end != maxStart) {
-									compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${endFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
-								}
-							} else {
-								if (chapter.type !== 'recap') {
-									compiledChapters.push(
-										`CHAPTER${compiledChapters.length / 2 + 1}=${startFormatted}`,
-										`CHAPTER${compiledChapters.length / 2 + 1}NAME=${chapter.type.charAt(0).toUpperCase() + chapter.type.slice(1)}`
-									);
-									if (chapter.end < epDuration && chapter.end != maxStart) {
-										compiledChapters.push(`CHAPTER${compiledChapters.length / 2 + 1}=${endFormatted}`, `CHAPTER${compiledChapters.length / 2 + 1}NAME=Episode`);
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+			const compiledChapters = sharedChapters;
 
 			const pbData = { total: 0, vpb: {}, apb: {}, meta: {} } as PlaybackData;
 
 			let videoStream: CrunchyPlayStream | null = null;
 			let audioStream: CrunchyPlayStream | null = null;
-			let isDLVideoBypass: boolean = options.vstream === 'android' || options.vstream === 'androidtab' ? true : false;
-			let isDLAudioBypass: boolean = options.astream === 'android' || options.astream === 'androidtab' ? true : false;
-			let isDLBypassCapable: boolean = true;
-
-			if (isDLVideoBypass || isDLAudioBypass) {
-				const me = await this.req.getData(api.me, AuthHeaders);
-				if (me.ok && me.res) {
-					const data_me = await me.res.json();
-					const benefits = await this.req.getData(`https://beta-api.crunchyroll.com/subs/v1/subscriptions/${data_me.external_id}/benefits`, AuthHeaders);
-					if (benefits.ok && benefits.res) {
-						const data_benefits = (await benefits.res.json()) as { items: { benefit: string }[] };
-						if (data_benefits?.items && !data_benefits.items.find((i) => i.benefit === 'offline_viewing')) {
-							isDLBypassCapable = false;
-						}
-					} else {
-						isDLBypassCapable = false;
-					}
-				} else {
-					isDLBypassCapable = false;
-				}
-			}
-
-			if (isDLVideoBypass && !isDLBypassCapable) {
-				isDLVideoBypass = false;
-				options.vstream = 'androidtv';
-				console.warn(
-					'VBR video downloads are not available on your current Crunchyroll plan. Please upgrade to the "Mega Fan" plan to enable this feature. Falling back to CBR video stream.'
-				);
-			}
-
-			if (isDLAudioBypass && !isDLBypassCapable) {
-				isDLAudioBypass = false;
-				options.astream = 'androidtv';
-				console.warn(
-					'192 kb/s audio downloads are not available on your current Crunchyroll plan. Please upgrade to the "Mega Fan" plan to enable this feature. Falling back to 128 kb/s CBR stream.'
-				);
-			}
+			let dlVideoBypass = isDLVideoBypass;
+			let dlAudioBypass = isDLAudioBypass;
 
 			// Disable CBR bypass for Music Videos since it does not work
 			if ((currentVersion ? currentVersion.guid : currentMediaId).startsWith('MV')) {
-				isDLVideoBypass = false;
-				isDLAudioBypass = false;
+				dlVideoBypass = false;
+				dlAudioBypass = false;
 				options.vstream = 'androidtv';
 				options.astream = 'androidtv';
-			}
-
-			if (options.tsd) {
-				console.warn('Total Session Death Active');
-				const activeStreamsReq = await this.req.getData(api.streaming_sessions, AuthHeaders);
-				if (activeStreamsReq.ok && activeStreamsReq.res) {
-					const data = await activeStreamsReq.res.json();
-					for (const s of data.items) {
-						await this.req.getData(`https://cr-play-service.prd.crunchyrollsvc.com/v1/token/${s.contentId}/${s.token}`, { ...{ method: 'DELETE' }, ...AuthHeaders });
-					}
-					console.warn(`Killed ${data.items?.length ?? 0} Sessions`);
-				}
 			}
 
 			const videoPlaybackReq = await this.req.getData(
@@ -2196,7 +2186,7 @@ export default class Crunchy implements ServiceClass {
 						hardsub_locale: stream.hlang
 					};
 				}
-				if (isDLVideoBypass) {
+				if (dlVideoBypass) {
 					const videoDLReq = await this.req.getData(
 						`https://cr-play-service.prd.crunchyrollsvc.com/v3/${currentVersion ? currentVersion.guid : currentMediaId}/${CrunchyVideoPlayStreams[options.vstream]}/download`,
 						AuthHeaders
@@ -2235,7 +2225,7 @@ export default class Crunchy implements ServiceClass {
 
 			if (!options.cstream && options.vstream !== options.astream && videoStream) {
 				const audioPlaybackReq = await this.req.getData(
-					`https://cr-play-service.prd.crunchyrollsvc.com/v3/${currentVersion ? currentVersion.guid : currentMediaId}/${CrunchyAudioPlayStreams[options.astream]}/${isDLAudioBypass ? 'download' : 'play?queue=1'}`,
+					`https://cr-play-service.prd.crunchyrollsvc.com/v3/${currentVersion ? currentVersion.guid : currentMediaId}/${CrunchyAudioPlayStreams[options.astream]}/${dlAudioBypass ? 'download' : 'play?queue=1'}`,
 					AuthHeaders
 				);
 				if (!audioPlaybackReq.ok || !audioPlaybackReq.res) {
@@ -2252,7 +2242,7 @@ export default class Crunchy implements ServiceClass {
 							hardsub_locale: stream.hlang
 						};
 					}
-					if (isDLAudioBypass) {
+					if (dlAudioBypass) {
 						audioStream.token = videoStream.token;
 						derivedPlaystreams[''] = {
 							url: this.convertDownloadToPlayback(audioStream.url, videoStream.url),
