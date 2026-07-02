@@ -259,6 +259,23 @@ const saveCRToken = (data: Record<string, unknown>) => {
 	}
 };
 
+const crDeviceIdFile = path.join(workingDir, 'config', 'cr_device_id');
+
+const loadCRDeviceId = (): string | undefined => {
+	const data = loadYamlCfgFile<{ device_id?: string }>(crDeviceIdFile, true);
+	const id = data.device_id;
+	return typeof id === 'string' && id.length > 0 ? id : undefined;
+};
+
+const saveCRDeviceId = (deviceId: string) => {
+	try {
+		fs.mkdirSync(path.dirname(crDeviceIdFile), { recursive: true });
+		fs.writeFileSync(`${crDeviceIdFile}.yml`, yaml.stringify({ device_id: deviceId }));
+	} catch (e) {
+		console.error("Can't save Crunchyroll device id to disk!");
+	}
+};
+
 const loadADNToken = () => {
 	let token = loadYamlCfgFile(tokenFile.adn, true);
 	if (typeof token !== 'object' || token === null || Array.isArray(token)) {
@@ -422,6 +439,8 @@ export {
 	loadCRSession,
 	saveCRToken,
 	loadCRToken,
+	saveCRDeviceId,
+	loadCRDeviceId,
 	saveADNToken,
 	loadADNToken,
 	saveHDSession,

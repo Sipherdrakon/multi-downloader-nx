@@ -418,7 +418,7 @@ export default class Crunchy implements ServiceClass {
 		const basic = atob(api.basic_auth_token);
 		const client = basic.split(':');
 
-		const uuid = randomUUID();
+		const uuid = this.getAccountDeviceId();
 		const authData = new URLSearchParams({
 			username: data.username,
 			password: data.password,
@@ -455,7 +455,7 @@ export default class Crunchy implements ServiceClass {
 		}
 
 		this.token = await authReq.res.json();
-		this.token.device_id = uuid;
+		this.rememberAccountDeviceId(uuid);
 		this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
 		yamlCfg.saveCRToken(this.token);
 		await this.getProfile();
@@ -501,7 +501,6 @@ export default class Crunchy implements ServiceClass {
 		}
 
 		this.token = await authReq.res.json();
-		this.token.device_id = uuid;
 		this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
 		yamlCfg.saveCRToken(this.token);
 	}
@@ -536,6 +535,20 @@ export default class Crunchy implements ServiceClass {
 		});
 	}
 
+	/** Stable device id for account auth — one per install (GUI/CLI each have their own config dir). */
+	private getAccountDeviceId(): string {
+		const persisted = yamlCfg.loadCRDeviceId();
+		if (persisted) return persisted;
+		const created = randomUUID();
+		yamlCfg.saveCRDeviceId(created);
+		return created;
+	}
+
+	private rememberAccountDeviceId(deviceId: string): void {
+		this.token.device_id = deviceId;
+		yamlCfg.saveCRDeviceId(deviceId);
+	}
+
 	private episodeBatchPauseMs(options: CrunchyDownloadOptions, isSeries?: boolean): number {
 		if (options.waittime > 0) return 0;
 		if (options.all || isSeries) return BATCH_EPISODE_WAIT_MS;
@@ -546,7 +559,7 @@ export default class Crunchy implements ServiceClass {
 		const basic = atob(api.basic_auth_token);
 		const client = basic.split(':');
 
-		const uuid = randomUUID();
+		const uuid = this.getAccountDeviceId();
 		const authData = new URLSearchParams({
 			refresh_token: this.token.refresh_token,
 			grant_type: 'refresh_token',
@@ -585,7 +598,7 @@ export default class Crunchy implements ServiceClass {
 		}
 
 		this.token = await authReq.res.json();
-		this.token.device_id = uuid;
+		this.rememberAccountDeviceId(uuid);
 		this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
 		yamlCfg.saveCRToken(this.token);
 		await this.getProfile(false);
@@ -618,7 +631,7 @@ export default class Crunchy implements ServiceClass {
 			const basic = atob(api.basic_auth_token);
 			const client = basic.split(':');
 
-			const uuid = this.token.device_id || randomUUID();
+			const uuid = this.getAccountDeviceId();
 			const authData = new URLSearchParams({
 				grant_type: 'refresh_token',
 				refresh_token: this.token.refresh_token,
@@ -656,7 +669,7 @@ export default class Crunchy implements ServiceClass {
 			}
 
 			this.token = await authReq.res.json();
-			this.token.device_id = uuid;
+			this.rememberAccountDeviceId(uuid);
 			this.token.expires = new Date(Date.now() + this.token.expires_in * 1000);
 			yamlCfg.saveCRToken(this.token);
 		}
