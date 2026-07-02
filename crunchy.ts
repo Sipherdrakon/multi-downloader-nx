@@ -1167,7 +1167,7 @@ export default class Crunchy implements ServiceClass {
 
 		// Fallback runs BEFORE the total line, and auth is already fresh so no mid-list logging
 		if (isEpisodeFeed) {
-			await this.getRecentEpisodesFallback(newlyAddedResults.items);
+			await this.getRecentEpisodesFallback(newlyAddedResults.items, page ?? 1, newlyAddedReqOpts);
 		}
 
 		// calculate pages
@@ -1178,7 +1178,7 @@ export default class Crunchy implements ServiceClass {
 		console.info(`  Total results: ${newlyAddedResults.total} (Page: ${pageCur}/${pageMax}) [${elapsed}s]`);
 	}
 
-	private async getRecentEpisodesFallback(existingItems: any[]) {
+	private async getRecentEpisodesFallback(existingItems: any[], page: number, reqOpts: { headers: Record<string, string> }) {
 		try {
 			const cutoffDate = new Date();
 			cutoffDate.setDate(cutoffDate.getDate() - 8);
@@ -1186,7 +1186,13 @@ export default class Crunchy implements ServiceClass {
 			// Collect existing episode IDs
 			const existingEpisodeIds = new Set<string>(existingItems.map((item) => item.id).filter(Boolean));
 
-			// Collect series IDs from feed items (only from this week)
+			const seriesIdsInEpisodeFeed = new Set<string>();
+			for (const item of existingItems) {
+				const sid = item.episode_metadata?.series_id ?? item.series_id;
+				if (sid) seriesIdsInEpisodeFeed.add(sid);
+			}
+
+			// Collect series IDs from episode feed items (only from this week)
 			const seriesIds = new Set<string>();
 			for (const item of existingItems) {
 				const uploadDate = item.episode_metadata?.premium_available_date ?? item.premium_available_date;
@@ -1196,15 +1202,31 @@ export default class Crunchy implements ServiceClass {
 				if (sid) seriesIds.add(sid);
 			}
 
+			// Series newly-added page 1: catch shows updated recently with no episode in the episode feed
+			if (page <= 1) {
+				const seriesFeedParams = new URLSearchParams({
+					sort_by: 'newly_added',
+					type: 'series',
+					n: '25',
+					start: '0',
+					preferred_audio_language: 'ja-JP',
+					force_locale: '',
+					locale: this.locale
+				}).toString();
+				const seriesFeedReq = await this.req.getData(`${api.browse}?${seriesFeedParams}`, reqOpts);
+				if (seriesFeedReq.ok && seriesFeedReq.res) {
+					const seriesFeed = await seriesFeedReq.res.json();
+					for (const item of seriesFeed.items ?? []) {
+						if (!item.last_public || new Date(item.last_public) < cutoffDate) continue;
+						if (seriesIdsInEpisodeFeed.has(item.id)) continue;
+						seriesIds.add(item.id);
+					}
+				}
+			}
+
 			if (seriesIds.size === 0) return;
 
-			// Auth is already fresh from getNewlyAdded — no refreshToken call here
-			const AuthHeaders = {
-				headers: {
-					Authorization: `Bearer ${this.token.access_token}`,
-					...api.crunchyDefHeader
-				}
-			};
+			const AuthHeaders = reqOpts;
 
 			const seriesArr = [...seriesIds];
 			const CONCURRENCY = 5;
