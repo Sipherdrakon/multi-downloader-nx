@@ -161,6 +161,36 @@ const MessageChannelProvider: FCWithChildren = ({ children }) => {
 		};
 	}, [socket]);
 
+	// Stable identity across store-driven re-renders. Recreating this object every
+	// render makes every consumer's [msg] effect re-fire (StartQueue button races).
+	const messageHandler = React.useMemo((): FrontEndMessages | undefined => {
+		if (!socket) return undefined;
+		return {
+			name: 'default',
+			auth: async (data) => (await messageAndResponse(socket, { name: 'auth', data })).data,
+			version: async () => (await messageAndResponse(socket, { name: 'version', data: undefined })).data,
+			checkToken: async () => (await messageAndResponse(socket, { name: 'checkToken', data: undefined })).data,
+			search: async (data) => (await messageAndResponse(socket, { name: 'search', data })).data,
+			handleDefault: async (data) => (await messageAndResponse(socket, { name: 'default', data })).data,
+			availableDubCodes: async () => (await messageAndResponse(socket, { name: 'availableDubCodes', data: undefined })).data,
+			availableSubCodes: async () => (await messageAndResponse(socket, { name: 'availableSubCodes', data: undefined })).data,
+			resolveItems: async (data) => (await messageAndResponse(socket, { name: 'resolveItems', data })).data,
+			listEpisodes: async (data) => (await messageAndResponse(socket, { name: 'listEpisodes', data })).data,
+			randomEvents: randomEventHandler,
+			downloadItem: (data) => messageAndResponse(socket, { name: 'downloadItem', data }),
+			isDownloading: async () => (await messageAndResponse(socket, { name: 'isDownloading', data: undefined })).data,
+			openFolder: async (data) => messageAndResponse(socket, { name: 'openFolder', data }),
+			logout: async () => (await messageAndResponse(socket, { name: 'changeProvider', data: undefined })).data,
+			openFile: async (data) => await messageAndResponse(socket, { name: 'openFile', data }),
+			openURL: async (data) => await messageAndResponse(socket, { name: 'openURL', data }),
+			getQueue: async () => (await messageAndResponse(socket, { name: 'getQueue', data: undefined })).data,
+			removeFromQueue: async (data) => await messageAndResponse(socket, { name: 'removeFromQueue', data }),
+			clearQueue: async () => await messageAndResponse(socket, { name: 'clearQueue', data: undefined }),
+			setDownloadQueue: async (data) => await messageAndResponse(socket, { name: 'setDownloadQueue', data }),
+			getDownloadQueue: async () => (await messageAndResponse(socket, { name: 'getDownloadQueue', data: undefined })).data
+		};
+	}, [socket, randomEventHandler]);
+
 	if (usePassword === 'waiting') return <></>;
 
 	if (socket === undefined) {
@@ -213,31 +243,6 @@ const MessageChannelProvider: FCWithChildren = ({ children }) => {
 			</Box>
 		);
 	}
-
-	const messageHandler: FrontEndMessages = {
-		name: 'default',
-		auth: async (data) => (await messageAndResponse(socket, { name: 'auth', data })).data,
-		version: async () => (await messageAndResponse(socket, { name: 'version', data: undefined })).data,
-		checkToken: async () => (await messageAndResponse(socket, { name: 'checkToken', data: undefined })).data,
-		search: async (data) => (await messageAndResponse(socket, { name: 'search', data })).data,
-		handleDefault: async (data) => (await messageAndResponse(socket, { name: 'default', data })).data,
-		availableDubCodes: async () => (await messageAndResponse(socket, { name: 'availableDubCodes', data: undefined })).data,
-		availableSubCodes: async () => (await messageAndResponse(socket, { name: 'availableSubCodes', data: undefined })).data,
-		resolveItems: async (data) => (await messageAndResponse(socket, { name: 'resolveItems', data })).data,
-		listEpisodes: async (data) => (await messageAndResponse(socket, { name: 'listEpisodes', data })).data,
-		randomEvents: randomEventHandler,
-		downloadItem: (data) => messageAndResponse(socket, { name: 'downloadItem', data }),
-		isDownloading: async () => (await messageAndResponse(socket, { name: 'isDownloading', data: undefined })).data,
-		openFolder: async (data) => messageAndResponse(socket, { name: 'openFolder', data }),
-		logout: async () => (await messageAndResponse(socket, { name: 'changeProvider', data: undefined })).data,
-		openFile: async (data) => await messageAndResponse(socket, { name: 'openFile', data }),
-		openURL: async (data) => await messageAndResponse(socket, { name: 'openURL', data }),
-		getQueue: async () => (await messageAndResponse(socket, { name: 'getQueue', data: undefined })).data,
-		removeFromQueue: async (data) => await messageAndResponse(socket, { name: 'removeFromQueue', data }),
-		clearQueue: async () => await messageAndResponse(socket, { name: 'clearQueue', data: undefined }),
-		setDownloadQueue: async (data) => await messageAndResponse(socket, { name: 'setDownloadQueue', data }),
-		getDownloadQueue: async () => (await messageAndResponse(socket, { name: 'getDownloadQueue', data: undefined })).data
-	};
 
 	return <messageChannelContext.Provider value={messageHandler}>{children}</messageChannelContext.Provider>;
 };
