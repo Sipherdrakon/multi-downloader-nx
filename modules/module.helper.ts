@@ -1,4 +1,5 @@
 // Helper functions
+import fs from 'fs';
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import childProcess from 'child_process';
@@ -6,6 +7,28 @@ import { console } from './log';
 import { languages } from './module.langsData';
 
 export default class Helper {
+	private static readonly ZERO_KID = '00000000000000000000000000000000';
+
+	/** Build mp4decrypt --key args for every usable license key (not just [0]). */
+	static mp4decryptKeyArgs(keys: { kid: string; key: string }[] | undefined): string {
+		const list = (keys ?? []).filter((k) => k?.kid && k?.key);
+		const content = list.filter((k) => k.kid !== Helper.ZERO_KID);
+		return (content.length ? content : list).map((k) => `--key ${k.kid}:${k.key}`).join(' ');
+	}
+
+	/** True if decrypted output still has CENC sample entries (mp4decrypt exit 0 does not guarantee decrypt). */
+	static fileStillEncrypted(filePath: string): boolean {
+		const fd = fs.openSync(filePath, 'r');
+		try {
+			const buf = Buffer.alloc(65536);
+			const n = fs.readSync(fd, buf, 0, buf.length, 0);
+			const head = buf.subarray(0, n);
+			return head.includes(Buffer.from('encv')) || head.includes(Buffer.from('enca'));
+		} finally {
+			fs.closeSync(fd);
+		}
+	}
+
 	private static tokenizeArguments(command: string): string[] {
 		const args: string[] = [];
 		let current = '';

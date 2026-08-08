@@ -161,11 +161,12 @@ export async function getKeysWVD(pssh: string | undefined, licenseServer: string
 
 	const lic = await licReq.res.arrayBuffer();
 	const lictext = new TextDecoder().decode(lic);
+	const parse = (raw: Buffer) => (session.parseLicense(raw) as (KeyContainer | undefined)[]).filter((k): k is KeyContainer => !!k?.kid && !!k?.key);
 	try {
 		const json = JSON.parse(lictext);
-		return session.parseLicense(Buffer.from(json['license'], 'base64')) as KeyContainer[];
+		return parse(Buffer.from(json['license'], 'base64'));
 	} catch {
-		return session.parseLicense(Buffer.from(new Uint8Array(lic))) as KeyContainer[];
+		return parse(Buffer.from(new Uint8Array(lic)));
 	}
 }
 

@@ -2902,8 +2902,8 @@ export default class Crunchy implements ServiceClass {
 						) {
 							console.info('Decryption Needed, attempting to decrypt');
 							if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
-								let commandBaseVideo = `--show-progress --key ${encryptionKeysVideo?.[0].kid}:${encryptionKeysVideo?.[0].key} `;
-								let commandBaseAudio = `--show-progress --key ${encryptionKeysAudio?.[0].kid}:${encryptionKeysAudio?.[0].key} `;
+								let commandBaseVideo = `--show-progress ${Helper.mp4decryptKeyArgs(encryptionKeysVideo)} `;
+								let commandBaseAudio = `--show-progress ${Helper.mp4decryptKeyArgs(encryptionKeysAudio)} `;
 								let commandVideo = commandBaseVideo + `"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
 								let commandAudio = commandBaseAudio + `"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
 
@@ -2928,6 +2928,15 @@ export default class Crunchy implements ServiceClass {
 											console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
 										}
 										fs.renameSync(`${tempTsFile}.video.enc.m4s`, `${tsFile}.video.enc.m4s`);
+										return undefined;
+									} else if (Helper.fileStillEncrypted(`${tempTsFile}.video.m4s`)) {
+										console.error('Decryption reported success but video is still encrypted (encv)');
+										fs.renameSync(`${tempTsFile}.video.enc.m4s`, `${tsFile}.video.enc.m4s`);
+										try {
+											fs.unlinkSync(`${tempTsFile}.video.m4s`);
+										} catch {
+											/* ignore */
+										}
 										return undefined;
 									} else {
 										console.info('Decryption done for video');
@@ -2959,6 +2968,15 @@ export default class Crunchy implements ServiceClass {
 											console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
 										}
 										fs.renameSync(`${tempTsFile}.audio.enc.m4s`, `${tsFile}.audio.enc.m4s`);
+										return undefined;
+									} else if (Helper.fileStillEncrypted(`${tempTsFile}.audio.m4s`)) {
+										console.error('Decryption reported success but audio is still encrypted (enca)');
+										fs.renameSync(`${tempTsFile}.audio.enc.m4s`, `${tsFile}.audio.enc.m4s`);
+										try {
+											fs.unlinkSync(`${tempTsFile}.audio.m4s`);
+										} catch {
+											/* ignore */
+										}
 										return undefined;
 									} else {
 										if (!options.nocleanup) {

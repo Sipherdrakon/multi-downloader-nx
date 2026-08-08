@@ -1269,7 +1269,7 @@ export default class Hidive implements ServiceClass {
 						return undefined;
 					}
 					if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
-						let commandBase = `--show-progress --key ${encryptionKeys[0].kid}:${encryptionKeys[0].key} `;
+						let commandBase = `--show-progress ${Helper.mp4decryptKeyArgs(encryptionKeys)} `;
 						let commandVideo = commandBase + `"${tempTsFile}.video.enc.m4s" "${tempTsFile}.video.m4s"`;
 
 						if (this.cfg.bin.shaka) {
@@ -1290,6 +1290,15 @@ export default class Hidive implements ServiceClass {
 								console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
 							}
 							fs.renameSync(`${tempTsFile}.video.enc.m4s`, `${tsFile}.video.enc.m4s`);
+							return undefined;
+						} else if (Helper.fileStillEncrypted(`${tempTsFile}.video.m4s`)) {
+							console.error('Decryption reported success but video is still encrypted (encv)');
+							fs.renameSync(`${tempTsFile}.video.enc.m4s`, `${tsFile}.video.enc.m4s`);
+							try {
+								fs.unlinkSync(`${tempTsFile}.video.m4s`);
+							} catch {
+								/* ignore */
+							}
 							return undefined;
 						} else {
 							console.info('Decryption done for video');
@@ -1380,7 +1389,7 @@ export default class Hidive implements ServiceClass {
 						return undefined;
 					}
 					if (this.cfg.bin.mp4decrypt || this.cfg.bin.shaka) {
-						let commandBase = `--show-progress --key ${encryptionKeys[0].kid}:${encryptionKeys[0].key} `;
+						let commandBase = `--show-progress ${Helper.mp4decryptKeyArgs(encryptionKeys)} `;
 						let commandAudio = commandBase + `"${tempTsFile}.audio.enc.m4s" "${tempTsFile}.audio.m4s"`;
 
 						if (this.cfg.bin.shaka) {
@@ -1401,6 +1410,15 @@ export default class Hidive implements ServiceClass {
 								console.error(`Downgrade to Shaka-Packager v2.6.1 (https://github.com/shaka-project/shaka-packager/releases/tag/v2.6.1) and try again`);
 							}
 							fs.renameSync(`${tempTsFile}.audio.enc.m4s`, `${tsFile}.audio.enc.m4s`);
+							return undefined;
+						} else if (Helper.fileStillEncrypted(`${tempTsFile}.audio.m4s`)) {
+							console.error('Decryption reported success but audio is still encrypted (enca)');
+							fs.renameSync(`${tempTsFile}.audio.enc.m4s`, `${tsFile}.audio.enc.m4s`);
+							try {
+								fs.unlinkSync(`${tempTsFile}.audio.m4s`);
+							} catch {
+								/* ignore */
+							}
 							return undefined;
 						} else {
 							if (!options.nocleanup) {
